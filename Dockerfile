@@ -62,7 +62,7 @@ RUN groupadd --system --gid 1001 legaledge \
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /srv/legaledge
-COPY --chown=legaledge:legaledge pyproject.toml README.md ./
+COPY --chown=legaledge:legaledge pyproject.toml README.md alembic.ini ./
 COPY --chown=legaledge:legaledge apps ./apps
 COPY --chown=legaledge:legaledge cli ./cli
 COPY --chown=legaledge:legaledge content ./content
