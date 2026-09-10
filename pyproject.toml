@@ -122,6 +122,8 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["app", "legaledge_kb"]
 
+# Advisory, not a gate (scope decision 2026-09-11): run `mypy` when touching
+# typed plumbing, but a failure does not block a stage. ruff remains a gate.
 [tool.mypy]
 python_version = "3.12"
 files = ["apps/api/app", "cli/legaledge_kb", "tests"]
