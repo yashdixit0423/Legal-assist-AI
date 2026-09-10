@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  # CI-only values. Never reuse these anywhere real.
+  DATABASE_URL: postgresql://legaledge:legaledge@localhost:5432/legaledge_test
+  JWT_SECRET: ci-only-secret-value-of-at-least-32-chars
+  CREDENTIAL_ENC_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  APP_ENV: ci
+  LOG_JSON: "true"
+
+jobs:
+  quality:
+    name: lint · types · tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: legaledge
+          POSTGRES_PASSWORD: legaledge
+          POSTGRES_DB: legaledge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U legaledge -d legaledge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements/api.txt
+            requirements/dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/api.txt -r requirements/dev.txt
+          pip install --no-deps -e .
+
+      - name: Requirements files match pyproject
+        run: python scripts/sync_requirements.py --check
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format check
+        run: ruff format --check .
+
+      - name: Types
+        run: mypy
+
+      - name: Tests
+        run: pytest -q --cov --cov-report=term-missing
+
+  docker:
+    name: image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
