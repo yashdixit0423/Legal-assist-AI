@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.pool import NullPool
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -94,3 +96,134 @@ async def _dispose_engine_after_each_test() -> AsyncIterator[None]:
     from app.db.session import dispose_engine
 
     await dispose_engine()
+
+
+# ---------------------------------------------------------------------------
+# Database fixtures.
+#
+# Every database-backed test runs against a throwaway database created by the
+# real Alembic migration — not by ``create_all`` — so what the tests exercise is
+# the schema production will actually have. The database name carries a random
+# suffix and is dropped afterwards, so a run never inherits its own leftovers.
+# ---------------------------------------------------------------------------
+
+
+def _split_dsn(url: str) -> tuple[str, str]:
+    """Return (server URL without database, database name)."""
+    server, _, database = url.rpartition("/")
+    return server, database
+
+
+def _admin_url() -> str:
+    """A sync URL pointed at the ``postgres`` maintenance database."""
+    from app.core.config import get_settings
+
+    server, _ = _split_dsn(get_settings().database_url_sync)
+    return f"{server}/postgres"
+
+
+def _postgres_is_reachable() -> bool:
+    import psycopg
+
+    try:
+        with psycopg.connect(_admin_url().replace("postgresql+psycopg://", "postgresql://")):
+            return True
+    except Exception:  # noqa: BLE001 — any failure means "cannot test against a DB"
+        return False
+
+
+@pytest.fixture(scope="session")
+def migrated_database() -> Iterator[str]:
+    """Create a uniquely named database, migrate it to head, drop it afterwards.
+
+    Yields the plain ``postgresql://`` URL of that database. Skips the test when
+    no PostgreSQL is reachable; CI always provides one, so nothing is silently
+    unverified there.
+    """
+    import uuid as _uuid
+
+    import psycopg
+
+    from alembic import command
+    from alembic.config import Config
+
+    if not _postgres_is_reachable():
+        pytest.skip("no reachable PostgreSQL for DATABASE_URL")
+
+    from app.core.config import get_settings
+
+    server, _ = _split_dsn(str(get_settings().DATABASE_URL))
+    name = f"legaledge_test_{_uuid.uuid4().hex[:10]}"
+    admin = _admin_url().replace("postgresql+psycopg://", "postgresql://")
+
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{name}"')
+
+    url = f"{server}/{name}"
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(REPO_ROOT / "apps" / "api" / "alembic"))
+    config.set_main_option("sqlalchemy.url", url.replace("postgresql://", "postgresql+psycopg://"))
+    try:
+        command.upgrade(config, "head")
+        yield url
+    finally:
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(
+                "select pg_terminate_backend(pid) from pg_stat_activity "
+                "where datname = %s and pid <> pg_backend_pid()",
+                (name,),
+            )
+            conn.execute(f'DROP DATABASE IF EXISTS "{name}"')
+
+
+@pytest.fixture
+def empty_database() -> Iterator[str]:
+    """An unmigrated database: no corpus tables at all."""
+    import uuid as _uuid
+
+    import psycopg
+
+    if not _postgres_is_reachable():
+        pytest.skip("no reachable PostgreSQL for DATABASE_URL")
+
+    from app.core.config import get_settings
+
+    server, _ = _split_dsn(str(get_settings().DATABASE_URL))
+    name = f"legaledge_bare_{_uuid.uuid4().hex[:10]}"
+    admin = _admin_url().replace("postgresql+psycopg://", "postgresql://")
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{name}"')
+    try:
+        yield f"{server}/{name}"
+    finally:
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(f'DROP DATABASE IF EXISTS "{name}"')
+
+
+@pytest.fixture
+async def db_session(migrated_database: str) -> AsyncIterator[AsyncSession]:
+    """An async session on the migrated database, rolled back after the test.
+
+    The session joins an outer transaction as a savepoint, so a test may call
+    ``commit()`` and still leave the database exactly as it found it.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+    engine = create_async_engine(
+        migrated_database.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with engine.connect() as connection:
+        transaction = await connection.begin()
+        session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+        try:
+            yield session
+        finally:
+            await session.close()
+            if transaction.is_active:
+                await transaction.rollback()
+    await engine.dispose()

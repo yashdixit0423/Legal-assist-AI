@@ -99,3 +99,50 @@ async def test_driver_level_failure_is_degraded_not_a_500(client, monkeypatch):
     response = await client.get("/v1/health")
     assert response.status_code == 503
     assert response.json()["database"]["error"] == "InvalidAuthorizationSpecificationError"
+
+
+async def test_health_reports_schema_ready_and_real_counts_after_migration(
+    client, monkeypatch, migrated_database
+):
+    """Stage 1 acceptance: /health distinguishes an empty stack from an unmigrated one."""
+    import datetime as dt
+
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.db.models import Statute
+
+    engine = create_async_engine(
+        migrated_database.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        session.add(
+            Statute(
+                slug="health-probe-act-1999",
+                short_title="Health Probe Act, 1999",
+                year=1999,
+                jurisdiction="India",
+                level="central",
+                source_portal="indiacode",
+                source_url="https://www.indiacode.nic.in/example",
+                source_sha256="c" * 64,
+                as_of_date=dt.date(2026, 8, 1),
+            )
+        )
+        await session.commit()
+
+    monkeypatch.setattr("app.api.v1.health.get_sessionmaker", lambda: factory)
+    try:
+        response = await client.get("/v1/health")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["database"]["schema_ready"] is True
+        assert body["corpus"]["statutes"] == 1
+    finally:
+        async with factory() as session:
+            await session.execute(delete(Statute).where(Statute.slug == "health-probe-act-1999"))
+            await session.commit()
+        await engine.dispose()

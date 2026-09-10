@@ -50,3 +50,11 @@ def test_env_example_documents_every_setting():
     example = (REPO_ROOT / ".env.example").read_text()
     undocumented = [name for name in Settings.model_fields if name not in example]
     assert not undocumented, f"absent from .env.example: {undocumented}"
+
+
+def test_dockerfile_ships_everything_the_migrations_need():
+    """`alembic upgrade head` has to work inside the container, not just locally."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text()
+    runtime = dockerfile.split("AS runtime", 1)[1]
+    assert "alembic.ini" in runtime, "alembic.ini is not copied into the runtime image"
+    assert "COPY --chown=legaledge:legaledge apps ./apps" in runtime
