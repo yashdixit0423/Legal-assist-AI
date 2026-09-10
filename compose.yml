@@ -1,0 +1,62 @@
+# Development stack: exactly two required services, plus redis behind a profile.
+# Production adds Caddy — see compose.prod.yml.
+name: legaledge
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-legaledge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-legaledge}
+      POSTGRES_DB: ${POSTGRES_DB:-legaledge}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-legaledge} -d ${POSTGRES_DB:-legaledge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: runtime
+      args:
+        INSTALL_CORPUS: ${INSTALL_CORPUS:-false}
+    env_file:
+      - .env
+    environment:
+      # Inside the network the database is reachable by service name.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-legaledge}:${POSTGRES_PASSWORD:-legaledge}@postgres:5432/${POSTGRES_DB:-legaledge}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Weights are cached in a named volume so containers do not re-download.
+      - model-cache:/models
+      - ${CORPUS_ARCHIVE_HOST_DIR:-./var/corpus_archive}:/srv/legaledge/var/corpus_archive
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional cache. Start with: docker compose --profile cache up -d
+  redis:
+    image: redis:7-alpine
+    profiles: ["cache"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  model-cache:

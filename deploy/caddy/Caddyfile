@@ -1,0 +1,39 @@
+# Automatic TLS via ACME. The API is the only upstream in Phase 1.1 — there is
+# no web app in this repository (backend-only scope; see docs/adr/0002).
+{
+	email {$LEGALEDGE_TLS_EMAIL}
+}
+
+{$LEGALEDGE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Prometheus metrics stay inside the perimeter.
+	handle /metrics {
+		respond 404
+	}
+
+	# Server-sent events must not be buffered, or /v1/ask stops streaming.
+	@sse path /v1/ask
+	handle @sse {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy api:8000
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,36 @@
+# Production overlay: Caddy terminates TLS, the API is not published directly.
+#   docker compose -f compose.yml -f compose.prod.yml up -d
+name: legaledge
+
+services:
+  api:
+    ports: !override []
+    environment:
+      APP_ENV: production
+      LOG_JSON: "true"
+    restart: always
+
+  postgres:
+    ports: !override []
+    restart: always
+
+  caddy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      LEGALEDGE_DOMAIN: ${LEGALEDGE_DOMAIN:?set LEGALEDGE_DOMAIN for automatic TLS}
+      LEGALEDGE_TLS_EMAIL: ${LEGALEDGE_TLS_EMAIL:?set LEGALEDGE_TLS_EMAIL for ACME}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: always
+
+volumes:
+  caddy-data:
+  caddy-config:
