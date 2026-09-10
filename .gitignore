@@ -1,0 +1,32 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# runtime data: archived source documents, model weights, dumps
+var/*
+!var/corpus_archive/
+var/corpus_archive/*
+!var/corpus_archive/.gitkeep
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
