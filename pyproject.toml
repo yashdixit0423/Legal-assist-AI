@@ -40,6 +40,9 @@ dependencies = [
   "httpx==0.27.2",
   "tenacity==9.0.0",
   "typer==0.13.1",
+  # Compatibility pin, not a new dependency: click 8.2 changed
+  # Parameter.make_metavar(), which typer 0.13 calls with the old signature.
+  "click==8.1.8",
   "rich==13.9.4",
   # Security
   "argon2-cffi==23.1.0",

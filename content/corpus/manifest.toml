@@ -1,0 +1,90 @@
+# The Acts to ingest. Data file, not code: adding the seventh Act is an edit
+# here plus one CLI command.
+#
+# act_id is India Code's stable identifier and links the Act item to its
+# section items. The AC_CEN_ prefix matters: searching by title alone returns
+# state re-publications of these central Acts (Chhattisgarh, UP, Rajasthan all
+# host their own copies), and ingesting one of those would put a state's text
+# under a central citation.
+#
+# expected_sections, where present, is an independent count from
+# NyayaLabs98/nyaya-statute-db. It is an oracle for the continuity check, not a
+# source of text — see docs/BUILD-LOG.md, 2026-09-11.
+
+[[act]]
+slug = "indian-contract-act-1872"
+short_title = "Indian Contract Act, 1872"
+tier = 1
+act_id = "AC_CEN_3_20_00035_187209_1523268996428"
+handle = "123456789/496413"
+act_number = "9"
+year = 1872
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Law and Justice"
+expected_sections = 192
+
+[[act]]
+slug = "transfer-of-property-act-1882"
+short_title = "Transfer of Property Act, 1882"
+tier = 1
+act_id = "AC_CEN_3_20_00042_188204_1523272233671"
+handle = "123456789/496421"
+act_number = "4"
+year = 1882
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Law and Justice"
+expected_sections = 135
+
+[[act]]
+slug = "registration-act-1908"
+short_title = "Registration Act, 1908"
+tier = 1
+act_id = "AC_CEN_18_43_00004_190816_1523340837338"
+handle = "123456789/496068"
+act_number = "16"
+year = 1908
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Rural Development"
+
+[[act]]
+slug = "indian-stamp-act-1899"
+short_title = "Indian Stamp Act, 1899"
+tier = 1
+act_id = "AC_CEN_2_2_00036_189902_1523339055436"
+handle = "123456789/496294"
+act_number = "2"
+year = 1899
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Finance"
+
+[[act]]
+slug = "information-technology-act-2000"
+short_title = "Information Technology Act, 2000"
+tier = 2
+act_id = "AC_CEN_45_76_00001_200021_1517807324077"
+handle = "123456789/496511"
+act_number = "21"
+year = 2000
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Electronics and Information Technology"
+# No oracle: the dataset's 122 rows count 14 provisions that India Code marks as
+# omitted (s.20, the Cyber Appellate Tribunal sections 49-56, s.66A, ss.91-94)
+# and are missing s.61, which is live law. Checked 2026-09-11 — where the oracle
+# and India Code disagree on this Act, India Code is right.
+
+[[act]]
+slug = "dpdp-act-2023"
+short_title = "Digital Personal Data Protection Act, 2023"
+tier = 2
+act_id = "AC_CEN_45_0_00003_2023-22_1763464807080"
+handle = "123456789/496508"
+act_number = "22"
+year = 2023
+jurisdiction = "India"
+level = "central"
+ministry = "Ministry of Electronics and Information Technology"

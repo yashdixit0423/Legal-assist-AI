@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
+from sqlalchemy import Engine
+from sqlalchemy import create_engine as _create_sync_engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 
@@ -63,3 +66,20 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency yielding a session that always closes."""
     async with get_sessionmaker()() as session:
         yield session
+
+
+# --- synchronous access, for the corpus pipeline ---------------------------
+# The API path is async throughout; the CLI is a batch job and psycopg is
+# simpler there (it is also the driver Alembic uses).
+
+
+def create_sync_engine(settings: Settings) -> Engine:
+    """Build a psycopg engine for the pipeline."""
+    return _create_sync_engine(
+        settings.database_url_sync, echo=settings.DB_ECHO, future=True
+    )
+
+
+def sync_session(settings: Settings) -> Session:
+    """A new synchronous session. The caller owns commit and close."""
+    return Session(bind=create_sync_engine(settings), expire_on_commit=False)

@@ -450,3 +450,111 @@ to proceed on that recommendation. Also still unanswered: PyYAML for the
 manifest. To avoid blocking, the manifest will be written as **TOML** (stdlib
 `tomllib`, no new dependency) unless directed otherwise — it stays a data file in
 `content/corpus/`, so adding the seventh Act remains a data edit.
+
+---
+
+## 2026-09-11 · Stage 2 (part 2) — fetcher, India Code adapter, parser, fixture
+
+Six Acts fetched, archived with checksums and parsed into the database: **778
+section rows, 665 of them in force.** All six pass the guardrails.
+
+### Built
+
+- `content/corpus/manifest.toml` — six Acts, TOML so no dependency was added.
+  Each entry pins India Code's `act_id`. **The `AC_CEN_` prefix is load-bearing:**
+  searching by title returns state re-publications of these central Acts
+  (Chhattisgarh, UP, Rajasthan and Delhi all host their own copies of the
+  Contract Act), and ingesting one would put a state's text under a central
+  citation. The central versions were found by scoping the search to the
+  "Acts" collection `69a0c1fb-7b22-4481-b16a-1dc59b5d02e6`.
+- `services/kb/fetch.py` — rate limit, exponential retry, contact-bearing
+  User-Agent, SHA-256, archive under `CORPUS_ARCHIVE_DIR`, resume from archive.
+- `services/kb/adapters/indiacode_api.py` — DSpace 7 REST adapter. Drops items
+  whose `act_id` differs from the one requested: the search endpoint is
+  full-text, so a neighbouring Act that merely mentions this one's identifier
+  would otherwise be ingested under the wrong citation.
+- `services/kb/parse.py` — HTML fragment to text using the standard library, no
+  lxml. Footnote markers are kept inline as `[N]`; `text_raw` keeps the original
+  fragment. `segment_section()` finds sub-section, proviso, Explanation and
+  Illustration boundaries for the Stage 3 chunker.
+- `services/kb/verify.py` — continuity, plausibility, duplicate and
+  marginal-note-coverage checks; non-zero exit on failure.
+- `services/kb/ingest.py` — fetch and parse orchestration, upserting by
+  `(statute_id, section_no)` and writing `ingest_runs`.
+- CLI: `fetch`, `parse`, `stats` (`--tier`, `--act`, `--refresh`, `--lenient`).
+- `eval/fixtures/dpdp-act-2023.{payload,golden}.json` and
+  `tests/unit/test_dpdp_fixture.py`.
+
+### Decisions
+
+**No lxml or selectolax on the primary path.** India Code's API returns short
+HTML fragments, so `html.parser` is enough. The corpus extras stay uninstalled
+for the API image and CI.
+
+**`click==8.1.8` pinned.** Not a new dependency — a compatibility pin on an
+existing transitive one. Click 8.2 changed `Parameter.make_metavar()`, which
+typer 0.13 calls with the old signature, so `--help` crashed.
+
+**The archive is the fetched JSON, not a PDF.** Provenance is the API payload's
+SHA-256. The English and Hindi PDFs are attached per Act on the same API and were
+deliberately not downloaded (Hindi is deferred).
+
+**`commenced_on` is null for DPDP.** India Code's `enforcement_date` is empty for
+that Act, which is correct — it commenced in phases by notification. Recorded as
+null rather than invented.
+
+**Verbatim text keeps the portal's own artefacts.** India Code's
+`section_page_note` contains `---` where the printed Act has an em dash, and
+straight quotes where it has curly ones. Restoring them would be editorialising
+the one field the product displays as authoritative, so the source bytes are kept
+as they are. Worth revisiting if the reader looks wrong.
+
+### What the guardrails caught
+
+Three real defects, all found by the continuity check rather than by reading code:
+
+1. **Repealed sections counted as live.** India Code keeps repealed provisions as
+   items so the numbering stays continuous. First detection attempt missed them
+   and the Contract Act came out at 260 in-force against an oracle of 190.
+2. **Two different repeal conventions.** The Contract Act writes the marginal
+   note `Repealed.`; the Transfer of Property Act writes `[Repealed.].` and puts
+   a footnote marker before the bracketed old note —
+   `[1][Decree of foreclosure suit.] Rep. by the Code of Civil Procedure`. The
+   detector handles both. After the fix, **Contract Act 192 and TPA 135, matching
+   the independent nyaya-statute-db counts exactly.**
+3. **My own manifest oracle was wrong** for the Contract Act (I wrote 190 from
+   arithmetic; the dataset has 192, and India Code agrees with the dataset).
+
+**Where the oracle is wrong and we are right:** the IT Act. The dataset's 122
+rows count 14 provisions that India Code marks omitted — s.20, the Cyber
+Appellate Tribunal sections 49–56, s.66A and ss.91–94 — and are missing s.61
+("Civil court not to have jurisdiction"), which is live law. `expected_sections`
+is therefore absent for that Act, with the reason in the manifest. Note that
+India Code itself marks **s.66A as "Omitted."** following *Shreya Singhal*, even
+though Parliament never repealed it; we follow the portal and keep the text.
+
+### Corpus as parsed
+
+| Act | rows | in force | warnings |
+|---|---:|---:|---|
+| Indian Contract Act, 1872 | 268 | 192 | none |
+| Transfer of Property Act, 1882 | 148 | 135 | none |
+| Registration Act, 1908 | 96 | 90 | 1 long section (s.89, 19.3k chars) |
+| Indian Stamp Act, 1899 | 97 | 95 | 2 long sections (s.2 19.1k, s.47 29.1k) |
+| Information Technology Act, 2000 | 125 | 109 | none |
+| DPDP Act, 2023 | 44 | 44 | none |
+
+The long-section warnings are genuine: those provisions are long tables of stamp
+duties and registrable documents. They matter for Stage 3, where sub-section
+splitting has to handle them without exceeding 450 tokens per chunk.
+
+### Known gaps
+
+- **No PART/CHAPTER hierarchy yet.** `statute_parts` is empty. India Code's
+  section items carry no chapter field, though the Act-level item reports
+  `no_of_chapter`. Deferred: the reader needs it, retrieval does not.
+- **Fixture verification is partial by design.** All 44 marginal notes were
+  checked against the Act's table of contents and two sections were read in full;
+  the other 42 are pinned by SHA-256, not independently re-read.
+- Registration Act and Indian Stamp Act have no independent section-count oracle
+  (the dataset does not carry them), so their counts rest on India Code alone.

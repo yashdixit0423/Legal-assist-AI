@@ -1,0 +1,503 @@
+{
+ "act": {
+  "title": "The Digital Personal Data Protection Act, 2023.",
+  "act_number": "22",
+  "year": 2023,
+  "enacted_on": "2023-08-11",
+  "commenced_on": "None",
+  "ministry": "Ministry of Electronics and Information Technology",
+  "is_repealed": false
+ },
+ "section_count": 44,
+ "sections": [
+  {
+   "section_no": "1",
+   "marginal_note": "Short title and commencement.",
+   "is_omitted": false,
+   "order_idx": 0,
+   "text_chars": 427,
+   "text_sha256": "f31063e27ca448d8518184ad5e85119b80bb621ec24e4f09620848ceb4368425",
+   "text_verbatim": "(1) This Act may be called the Digital Personal Data Protection Act, 2023.\n\n(2) It shall come into force on such date[1] as the Central Government may, by notification in the Official Gazette, appoint and [*]different dates may be appointed for different provisions of this Act and any reference in any such provision to the commencement of this Act shall be construed as a reference to the coming into force of that provision.",
+   "footnotes": [
+    {
+     "marker": "",
+     "text": "[*1]. 13th November, 2025--- Ss. 2, 18 to 26, 35 to 43 and sub-section (1) and (3) of s. 44;\n\nOne year from 13th November, 2025--- Sub-section (9) of s. 6 and clause (d) of sub-section (1) of s. 27;\n\nEighteen Months from 13th November, 2025--- Ss. 3 to 5, sub-sections (1) to (8) and (10) of s. 6, ss. 7 to 17, s. 27 except clause (d) of sub-section (1) of the said sections, ss. 28 to 34, 36, 37 and sub-section (2) of s. 44, vide notifn. No. G.S.R. 843(E), dated 13th November, 2025, see Gazette of India, Extraordinary, Part II, s. 3(i)."
+    }
+   ],
+   "amendment_note": "[*1]. 13th November, 2025--- Ss. 2, 18 to 26, 35 to 43 and sub-section (1) and (3) of s. 44;\n\nOne year from 13th November, 2025--- Sub-section (9) of s. 6 and clause (d) of sub-section (1) of s. 27;\n\nEighteen Months from 13th November, 2025--- Ss. 3 to 5, sub-sections (1) to (8) and (10) of s. 6, ss. 7 to 17, s. 27 except clause (d) of sub-section (1) of the said sections, ss. 28 to 34, 36, 37 and sub-section (2) of s. 44, vide notifn. No. G.S.R. 843(E), dated 13th November, 2025, see Gazette of India, Extraordinary, Part II, s. 3(i)."
+  },
+  {
+   "section_no": "2",
+   "marginal_note": "Definitions.",
+   "is_omitted": false,
+   "order_idx": 1,
+   "text_chars": 4701,
+   "text_sha256": "869537d8784e6612a138e8ffe8552cce282650ba4f07e0f87d3022a6205363d0",
+   "text_verbatim": "In this Act, unless the context otherwise requires,---\n\n(a) \"Appellate Tribunal\" means the Telecom Disputes Settlement and Appellate Tribunal established under section 14 of the Telecom Regulatory Authority of India Act, 1997 (24 of 1997);\n\n(b) \"automated\" means any digital process capable of operating automatically in response to instructions given or otherwise for the purpose of processing data;\n\n(c) \"Board\" means the Data Protection Board of India established by the Central Government under section 18;\n\n(d) \"certain legitimate uses\" means the uses referred to in section 7;\n\n(e) \"Chairperson\" means the Chairperson of the Board;\n\n(f) \"child\" means an individual who has not completed the age of eighteen years;\n\n(g) \"Consent Manager\" means a person registered with the Board, who acts as a single point of contact to enable a Data Principal to give, manage, review and withdraw her consent through an accessible, transparent and interoperable platform;\n\n(h) \"data\" means a representation of information, facts, concepts, opinions or instructions in a manner suitable for communication, interpretation or processing by human beings or by automated means;\n\n(i) \"Data Fiduciary\" means any person who alone or in conjunction with other persons determines the purpose and means of processing of personal data;\n\n(j) \"Data Principal\" means the individual to whom the personal data relates and where such individual is---\n\n(i) a child, includes the parents or lawful guardian of such a child;\n\n(ii) a person with disability, includes her lawful guardian, acting on her behalf;\n\n(k) \"Data Processor\" means any person who processes personal data on behalf of a Data Fiduciary;\n\n(l) \"Data Protection Officer\" means an individual appointed by the Significant Data Fiduciary under clause (a) of sub-section (2) of section 10;\n\n(m) \"digital office\" means an office that adopts an online mechanism wherein the proceedings, from receipt of intimation or complaint or reference or directions or appeal, as the case may be, to the disposal thereof, are conducted in online or digital mode;\n\n(n) \"digital personal data\" means personal data in digital form;\n\n(o) \"gain\" means---\n\n(i) a gain in property or supply of services, whether temporary or permanent; or\n\n(ii) an opportunity to earn remuneration or greater remuneration or to gain a financial advantage otherwise than by way of legitimate remuneration;\n\n(p) \"loss\" means---\n\n(i) a loss in property or interruption in supply of services, whether temporary or permanent; or\n\n(ii) a loss of opportunity to earn remuneration or greater remuneration or to gain a financial advantage otherwise than by way of legitimate remuneration;\n\n(q) \"Member\" means a Member of the Board and includes the Chairperson;\n\n(r) \"notification\" means a notification published in the Official Gazette and the expressions \"notify\" and \"notified\" shall be construed accordingly;\n\n(s) \"person\" includes---\n\n(i) an individual;\n\n(ii) a Hindu undivided family;\n\n(iii) a company;\n\n(iv) a firm;\n\n(v) an association of persons or a body of individuals, whether incorporated or not;\n\n(vi) the State; and\n\n(vii) every artificial juristic person, not falling within any of the preceding sub-clauses;\n\n(t) \"personal data\" means any data about an individual who is identifiable by or in relation to such data;\n\n(u) \"personal data breach\" means any unauthorised processing of personal data or accidental disclosure, acquisition, sharing, use, alteration, destruction or loss of access to personal data, that compromises the confidentiality, integrity or availability of personal data;\n\n(v) \"prescribed\" means prescribed by rules made under this Act;\n\n(w) \"proceeding\" means any action taken by the Board under the provisions of this Act;\n\n(x) \"processing\" in relation to personal data, means a wholly or partly automated operation or set of operations performed on digital personal data, and includes operations such as collection, recording, organisation, structuring, storage, adaptation, retrieval, use, alignment or combination, indexing, sharing, disclosure by transmission, dissemination or otherwise making available, restriction, erasure or destruction;\n\n(y) \"she\" in relation to an individual includes the reference to such individual irrespective of gender;\n\n(z) \"Significant Data Fiduciary\" means any Data Fiduciary or class of Data Fiduciaries as may be notified by the Central Government under section 10;\n\n(za) \"specified purpose\" means the purpose mentioned in the notice given by the Data Fiduciary to the Data Principal in accordance with the provisions of this Act and the rules made thereunder; and\n\n(zb) \"State\" means the State as defined under article 12 of the Constitution.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "3",
+   "marginal_note": "Application of Act.",
+   "is_omitted": false,
+   "order_idx": 2,
+   "text_chars": 1064,
+   "text_sha256": "1318e639e1d88670efa032a102fcfb2c3365374b52e73f15678e5984fd92e204",
+   "text_verbatim": "Subject to the provisions of this Act, it shall---\n\n(a) apply to the processing of digital personal data within the territory of India where the personal data is collected---\n\n(i) in digital form; or\n\n(ii) in non-digital form and digitised subsequently;\n\n(b) also apply to processing of digital personal data outside the territory of India, if such processing is in connection with any activity related to offering of goods or services to Data Principals within the territory of India;\n\n(c) not apply to---\n\n(i) personal data processed by an individual for any personal or domestic purpose; and\n\n(ii) personal data that is made or caused to be made publicly available by---\n\n(A) the Data Principal to whom such personal data relates; or\n\n(B) any other person who is under an obligation under any law for the time being in force in India to make such personal data publicly available.\n\nIllustration.\n\nX, an individual, while blogging her views, has publicly made available her personal data on social media. In such case, the provisions of this Act shall not apply.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "4",
+   "marginal_note": "Grounds for processing personal data.",
+   "is_omitted": false,
+   "order_idx": 3,
+   "text_chars": 366,
+   "text_sha256": "ef7a8b7500dff744e86b6cf867bbaffcece47794bcf6ab4b54520075a98db2aa",
+   "text_verbatim": "(1) A person may process the personal data of a Data Principal only in accordance with the provisions of this Act and for a lawful purpose,---\n\n(a) for which the Data Principal has given her consent; or\n\n(b) for certain legitimate uses.\n\n(2) For the purposes of this section, the expression \"lawful purpose\" means any purpose which is not expressly forbidden by law.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "5",
+   "marginal_note": "Notice.",
+   "is_omitted": false,
+   "order_idx": 4,
+   "text_chars": 2282,
+   "text_sha256": "a3e3bfc2664b8884b4ec3155a8a24292831eb324d6f7f00bd0fe3417dc4fc81b",
+   "text_verbatim": "(1) Every request made to a Data Principal under section 6 for consent shall be accompanied or preceded by a notice given by the Data Fiduciary to the Data Principal, informing her,---\n\n(i) the personal data and the purpose for which the same is proposed to be processed;\n\n(ii) the manner in which she may exercise her rights under sub-section (4) of section 6 and section 13; and\n\n(iii) the manner in which the Data Principal may make a complaint to the Board, in such manner and as may be prescribed.\n\nIllustration.\n\nX, an individual, opens a bank account using the mobile app or website of Y, a bank. To complete the Know-Your-Customer requirements under law for opening of bank account, X opts for processing of her personal data by Y in a live, video-based customer identification process. Y shall accompany or precede the request for the personal data with notice to X, describing the personal data and the purpose of its processing.\n\n(2) Where a Data Principal has given her consent for the processing of her personal data before the date of commencement of this Act,---\n\n(a) the Data Fiduciary shall, as soon as it is reasonably practicable, give to the Data Principal a notice informing her,---\n\n(i) the personal data and the purpose for which the same has been processed;\n\n(ii) the manner in which she may exercise her rights under sub-section (4) of section 6 and section 13; and\n\n(iii) the manner in which the Data Principal may make a complaint to the Board, in such manner and as may be prescribed.\n\n(b) the Data Fiduciary may continue to process the personal data until and unless the Data Principal withdraws her consent. Illustration.\n\nX, an individual, gave her consent to the processing of her personal data for an online shopping app or website operated by Y, an e-commerce service provider, before the commencement of this Act. Upon commencement of the Act, Y shall, as soon as practicable, give through email, in-app notification or other effective method information to X, describing the personal data and the purpose of its processing.\n\n(3) The Data Fiduciary shall give the Data Principal the option to access the contents of the notice referred to in sub-sections (1) and (2) in English or any language specified in the Eighth Schedule to the Constitution.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "6",
+   "marginal_note": "Consent.",
+   "is_omitted": false,
+   "order_idx": 5,
+   "text_chars": 4731,
+   "text_sha256": "dd437f3bb71f07456259d37b220d5b6c5c144805aeaf58f4b35ba54c2b60c956",
+   "text_verbatim": "(1) The consent given by the Data Principal shall be free, specific, informed, unconditional and unambiguous with a clear affirmative action, and shall signify an agreement to the processing of her personal data for the specified purpose and be limited to such personal data as is necessary for such specified purpose.\n\nIllustration.\n\nX, an individual, downloads Y, a telemedicine app. Y requests the consent of X for (i) the processing of her personal data for making available telemedicine services, and (ii) accessing her mobile phone contact list, and X signifies her consent to both. Since phone contact list is not necessary for making available telemedicine services, her consent shall be limited to the processing of her personal data for making available telemedicine services.\n\n(2) Any part of consent referred in sub-section (1) which constitutes an infringement of the provisions of this Act or the rules made thereunder or any other law for the time being in force shall be invalid to the extent of such infringement.\n\nIllustration.\n\nX, an individual, buys an insurance policy using the mobile app or website of Y, an insurer. She gives to Y her consent for (i) the processing of her personal data by Y for the purpose of issuing the policy, and (ii) waiving her right to file a complaint to the Data Protection Board of India. Part (ii) of the consent, relating to waiver of her right to file a complaint, shall be invalid.\n\n(3) Every request for consent under the provisions of this Act or the rules made thereunder shall be presented to the Data Principal in a clear and plain language, giving her the option to access such request in English or any language specified in the Eighth Schedule to the Constitution and providing the contact details of a Data Protection Officer, where applicable, or of any other person authorised by the Data Fiduciary to respond to any communication from the Data Principal for the purpose of exercise of her rights under the provisions of this Act.\n\n(4) Where consent given by the Data Principal is the basis of processing of personal data, such Data Principal shall have the right to withdraw her consent at any time, with the ease of doing so being comparable to the ease with which such consent was given.\n\n(5) The consequences of the withdrawal referred to in sub-section (4) shall be borne by the Data Principal, and such withdrawal shall not affect the legality of processing of the personal data based on consent before its withdrawal.\n\nIllustration.\n\nX, an individual, is the user of an online shopping app or website operated by Y, an e-commerce service provider. X consents to the processing of her personal data by Y for the purpose of fulfilling her supply order and places an order for supply of a good while making payment for the same. If X withdraws her consent, Y may stop enabling X to use the app or website for placing orders, but may not stop the processing for supply of the goods already ordered and paid for by X.\n\n(6) If a Data Principal withdraws her consent to the processing of personal data under sub-section (5), the Data Fiduciary shall, within a reasonable time, cease and cause its Data Processors to cease processing the personal data of such Data Principal unless such processing without her consent is required or authorised under the provisions of this Act or the rules made thereunder or any other law for the time being in force in India.\n\nIllustration.\n\nX, a telecom service provider, enters into a contract with Y, a Data Processor, for emailing telephone bills to the customers of X. Z, a customer of X, who had earlier given her consent to X for the processing of her personal data for emailing of bills, downloads the mobile app of X and opts to receive bills only on the app. X shall itself cease, and shall cause Y to cease, the processing of the personal data of Z for emailing bills.\n\n(7) The Data Principal may give, manage, review or withdraw her consent to the Data Fiduciary through a Consent Manager.\n\n(8) The Consent Manager shall be accountable to the Data Principal and shall act on her behalf in such manner and subject to such obligations as may be prescribed.\n\n(9) Every Consent Manager shall be registered with the Board in such manner and subject to such technical, operational, financial and other conditions as may be prescribed.\n\n(10) Where a consent given by the Data Principal is the basis of processing of personal data and a question arises in this regard in a proceeding, the Data Fiduciary shall be obliged to prove that a notice was given by her to the Data Principal and consent was given by such Data Principal to the Data Fiduciary in accordance with the provisions of this Act and the rules made thereunder.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "7",
+   "marginal_note": "Certain legitimate uses.",
+   "is_omitted": false,
+   "order_idx": 6,
+   "text_chars": 4088,
+   "text_sha256": "62e45319b8d9e3d5baba3afe94f60cc61f09fe57dbfdd9aa4ca957b8b653d111",
+   "text_verbatim": "A Data Fiduciary may process personal data of a Data Principal for any of following uses, namely:---\n\n(a) for the specified purpose for which the Data Principal has voluntarily provided her personal data to the Data Fiduciary, and in respect of which she has not indicated to the Data Fiduciary that she does not consent to the use of her personal data.\n\nIllustrations.\n\n(I) X, an individual, makes a purchase at Y, a pharmacy. She voluntarily provides Y her personal data and requests Y to acknowledge receipt of the payment made for the purchase by sending a message to her mobile phone. Y may process the personal data of X for the purpose of sending the receipt.\n\n(II) X, an individual, electronically messages Y, a real estate broker, requesting Y to help identify a suitable rented accommodation for her and shares her personal data for this purpose. Y may process her personal data to identify and intimate to her the details of accommodation available on rent. Subsequently, X informs Y that X no longer needs help from Y. Y shall cease to process the personal data of X;\n\n(b) for the State and any of its instrumentalities to provide or issue to the Data Principal such subsidy, benefit, service, certificate, licence or permit as may be prescribed, where---\n\n(i) she has previously consented to the processing of her personal data by the State or any of its instrumentalities for any subsidy, benefit, service, certificate, licence or permit; or\n\n(ii) such personal data is available in digital form in, or in non-digital form and digitised subsequently from, any database, register, book or other document which is maintained by the State or any of its instrumentalities and is notified by the Central Government,\n\nsubject to standards followed for processing being in accordance with the policy issued by the Central Government or any law for the time being in force for governance of personal data.\n\nIllustrations.\n\nX. a pregnant woman, enrols herself on an app or website to avail of government's maternity benefits programme, while consenting to provide her personal data for the purpose of availing of such benefits. Government may process the personal data of X processing to determine her eligibility to receive any other prescribed benefit from the government;\n\n(c) for the performance by the State or any of its instrumentalities of any function under any law for the time being in force in India or in the interest of sovereignty and integrity of India or security of the State;\n\n(d) for fulfilling any obligation under any law for the time being in force in India on any person to disclose any information to the State or any of its instrumentalities, subject to such processing being in accordance with the provisions regarding disclosure of such information in any other law for the time being in force;\n\n(e) for compliance with any judgment or decree or order issued under any law for the time being in force in India, or any judgment or order relating to claims of a contractual or civil nature under any law for the time being in force outside India;\n\n(f) for responding to a medical emergency involving a threat to the life or immediate threat to the health of the Data Principal or any other individual;\n\n(g) for taking measures to provide medical treatment or health services to any individual during an epidemic, outbreak of disease, or any other threat to public health;\n\n(h) for taking measures to ensure safety of, or provide assistance or services to, any individual during any disaster, or any breakdown of public order.\n\nExplanation.---For the purposes of this clause, the expression \"disaster\" shall have the same meaning as assigned to it in clause (d) of section 2 of the Disaster Management Act, 2005 (53 of 2005); or\n\n(i) for the purposes of employment or those related to safeguarding the employer from loss or liability, such as prevention of corporate espionage, maintenance of confidentiality of trade secrets, intellectual property, classified information or provision of any service or benefit sought by a Data Principal who is an employee.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "8",
+   "marginal_note": "General obligations of Data Fiduciary.",
+   "is_omitted": false,
+   "order_idx": 7,
+   "text_chars": 3808,
+   "text_sha256": "e39b90dfa35f22df53a470d7bd31a60c8a023924568604e19f1f14526c3ffb61",
+   "text_verbatim": "(1) A Data Fiduciary shall, irrespective of any agreement to the contrary or failure of a Data Principal to carry out the duties provided under this Act, be responsible for complying with the provisions of this Act and the rules made thereunder in respect of any processing undertaken by it or on its behalf by a Data Processor.\n\n(2) A Data Fiduciary may engage, appoint, use or otherwise involve a Data Processor to process personal data on its behalf for any activity related to offering of goods or services to Data Principals only under a valid contract.\n\n(3) Where personal data processed by a Data Fiduciary is likely to be---\n\n(a) used to make a decision that affects the Data Principal; or\n\n(b) disclosed to another Data Fiduciary,\n\nthe Data Fiduciary processing such personal data shall ensure its completeness, accuracy and consistency.\n\n(4) A Data Fiduciary shall implement appropriate technical and organisational measures to ensure effective observance of the provisions of this Act and the rules made thereunder.\n\n(5) A Data Fiduciary shall protect personal data in its possession or under its control, including in respect of any processing undertaken by it or on its behalf by a Data Processor, by taking reasonable security safeguards to prevent personal data breach.\n\n(6) In the event of a personal data breach, the Data Fiduciary shall give the Board and each affected Data Principal, intimation of such breach in such form and manner as may be prescribed.\n\n(7) A Data Fiduciary shall, unless retention is necessary for compliance with any law for the time being in force,---\n\n(a) erase personal data, upon the Data Principal withdrawing her consent or as soon as it is reasonable to assume that the specified purpose is no longer being served, whichever is earlier; and\n\n(b) cause its Data Processor to erase any personal data that was made available by the Data Fiduciary for processing to such Data Processor.\n\nIllustrations.\n\n(I) X, an individual, registers herself on an online marketplace operated by Y, an e-commerce service provider. X gives her consent to Y for the processing of her personal data for selling her used car. The online marketplace helps conclude the sale. Y shall no longer retain her personal data.\n\n(II) X, an individual, decides to close her savings account with Y, a bank. Y is required by law applicable to banks to maintain the record of the identity of its clients for a period of ten years beyond closing of accounts. Since retention is necessary for compliance with law, Y shall retain X's personal data for the said period.\n\n(8) The purpose referred to in clause (a) of sub-section (7) shall be deemed to no longer be served, if the Data Principal does not---\n\n(a) approach the Data Fiduciary for the performance of the specified purpose; and\n\n(b) exercise any of her rights in relation to such processing,\n\nfor such time period as may be prescribed, and different time periods may be prescribed for different classes of Data Fiduciaries and for different purposes.\n\n(9) A Data Fiduciary shall publish, in such manner as may be prescribed, the business contact information of a Data Protection Officer, if applicable, or a person who is able to answer on behalf of the Data Fiduciary, the questions, if any, raised by the Data Principal about the processing of her personal data.\n\n(10) A Data Fiduciary shall establish an effective mechanism to redress the grievances of Data Principals.\n\n(11) For the purposes of this section, it is hereby clarified that a Data Principal shall be considered as not having approached the Data Fiduciary for the performance of the specified purpose, in any period during which she has not initiated contact with the Data Fiduciary for such performance, in person or by way of communication in electronic or physical form.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "9",
+   "marginal_note": "Processing of personal data of children.",
+   "is_omitted": false,
+   "order_idx": 8,
+   "text_chars": 1381,
+   "text_sha256": "7baeb38b33e7e7b23d9122d5fb782f8d13c9ba902b16104fdc27152dc09148fe",
+   "text_verbatim": "(1) The Data Fiduciary shall, before processing any personal data of a child or a person with disability who has a lawful guardian obtain verifiable consent of the parent of such child or the lawful guardian, as the case may be, in such manner as may be prescribed.\n\nExplanation.--- For the purpose of this sub-section, the expression \"consent of the parent\" includes the consent of lawful guardian, wherever applicable.\n\n(2) A Data Fiduciary shall not undertake such processing of personal data that is likely to cause any detrimental effect on the well-being of a child.\n\n(3) A Data Fiduciary shall not undertake tracking or behavioural monitoring of children or targeted advertising directed at children.\n\n(4) The provisions of sub-sections (1) and (3) shall not be applicable to processing of personal data of a child by such classes of Data Fiduciaries or for such purposes, and subject to such conditions, as may be prescribed.\n\n(5) The Central Government may, if satisfied that a Data Fiduciary has ensured that its processing of personal data of children is done in a manner that is verifiably safe, notify for such processing by such Data Fiduciary the age above which that Data Fiduciary shall be exempt from the applicability of all or any of the obligations under sub-sections (1) and (3) in respect of processing by that Data Fiduciary as the notification may specify.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "10",
+   "marginal_note": "Additional obligations of Significant Data Fiduciary.",
+   "is_omitted": false,
+   "order_idx": 9,
+   "text_chars": 1580,
+   "text_sha256": "6f363f413576130e2b41ad132c04e522b25e28167440d8a68e393eae42e3d652",
+   "text_verbatim": "(1) The Central Government may notify any Data Fiduciary or class of Data Fiduciaries as Significant Data Fiduciary, on the basis of an assessment of such relevant factors as it may determine, including---\n\n(a) the volume and sensitivity of personal data processed;\n\n(b) risk to the rights of Data Principal;\n\n(c) potential impact on the sovereignty and integrity of India;\n\n(d) risk to electoral democracy;\n\n(e) security of the State; and\n\n(f) public order.\n\n(2) The Significant Data Fiduciary shall---\n\n(a) appoint a Data Protection Officer who shall---\n\n(i) represent the Significant Data Fiduciary under the provisions of this Act;\n\n(ii) be based in India;\n\n(iii) be an individual responsible to the Board of Directors or similar governing body of the Significant Data Fiduciary; and\n\n(iv) be the point of contact for the grievance redressal mechanism under the provisions of this Act;\n\n(b) appoint an independent data auditor to carry out data audit, who shall evaluate the compliance of the Significant Data Fiduciary in accordance with the provisions of this Act; and\n\n(c) undertake the following other measures, namely:---\n\n(i) periodic Data Protection Impact Assessment, which shall be a process comprising a description of the rights of Data Principals and the purpose of processing of their personal data, assessment and management of the risk to the rights of the Data Principals, and such other matters regarding such process as may be prescribed;\n\n(ii) periodic audit; and\n\n(iii) such other measures, consistent with the provisions of this Act, as may be prescribed.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "11",
+   "marginal_note": "Right to access information about personal data.",
+   "is_omitted": false,
+   "order_idx": 10,
+   "text_chars": 1295,
+   "text_sha256": "b22d3bf1ef8754a23446f55a5dfb4dfabac9cf4d224704665b9cb0512b9ea7d5",
+   "text_verbatim": "(1) The Data Principal shall have the right to obtain from the Data Fiduciary to whom she has previously given consent, including consent as referred to in clause (a) of section 7 (hereinafter referred to as the said Data Fiduciary), for processing of personal data, upon making to it a request in such manner as may be prescribed,---\n\n(a) a summary of personal data which is being processed by such Data Fiduciary and the processing activities undertaken by that Data Fiduciary with respect to such personal data;\n\n(b) the identities of all other Data Fiduciaries and Data Processors with whom the personal data has been shared by such Data Fiduciary, along with a description of the personal data so shared; and\n\n(c) any other information related to the personal data of such Data Principal and its processing, as may be prescribed.\n\n(2) Nothing contained in clause (b) or clause (c) of sub-section (1) shall apply in respect of the sharing of any personal data by the said Data Fiduciary with any other Data Fiduciary authorised by law to obtain such personal data, where such sharing is pursuant to a request made in writing by such other Data Fiduciary for the purpose of prevention or detection or investigation of offences or cyber incidents, or for prosecution or punishment of offences.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "12",
+   "marginal_note": "Right to correction and erasure of personal data.",
+   "is_omitted": false,
+   "order_idx": 11,
+   "text_chars": 927,
+   "text_sha256": "989902509727f00d1d05a9e17e0eec37f077298bd5c4b39a0870aa8186098900",
+   "text_verbatim": "(1) A Data Principal shall have the right to correction, completion, updating and erasure of her personal data for the processing of which she has previously given consent, including consent as referred to in clause (a) of section 7, in accordance with any requirement or procedure under any law for the time being in force.\n\n(2) A Data Fiduciary shall, upon receiving a request for correction, completion or updating from a Data Principal,---\n\n(a) correct the inaccurate or misleading personal data;\n\n(b) complete the incomplete personal data; and\n\n(c) update the personal data.\n\n(3) A Data Principal shall make a request in such manner as may be prescribed to the Data Fiduciary for erasure of her personal data, and upon receipt of such a request, the Data Fiduciary shall erase her personal data unless retention of the same is necessary for the specified purpose or for compliance with any law for the time being in force.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "13",
+   "marginal_note": "Right of grievance redressal.",
+   "is_omitted": false,
+   "order_idx": 12,
+   "text_chars": 763,
+   "text_sha256": "d856a2d440a673670467637a78e3c220623030c4bfca21b2bb610d3f25833e65",
+   "text_verbatim": "(1) A Data Principal shall have the right to have readily available means of grievance redressal provided by a Data Fiduciary or Consent Manager in respect of any act or omission of such Data Fiduciary or Consent Manager regarding the performance of its obligations in relation to the personal data of such Data Principal or the exercise of her rights under the provisions of this Act and the rules made thereunder.\n\n(2) The Data Fiduciary or Consent Manager shall respond to any grievances referred to in sub-section (1) within such period as may be prescribed from the date of its receipt for all or any class of Data Fiduciaries.\n\n(3) The Data Principal shall exhaust the opportunity of redressing her grievance under this section before approaching the Board.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "14",
+   "marginal_note": "Right to nominate.",
+   "is_omitted": false,
+   "order_idx": 13,
+   "text_chars": 541,
+   "text_sha256": "644d2845d055bac9a8a970d2487aac13dab1afa153a17480799f982b87a136ce",
+   "text_verbatim": "(1) A Data Principal shall have the right to nominate, in such manner as may be prescribed, any other individual, who shall, in the event of death or incapacity of the Data Principal, exercise the rights of the Data Principal in accordance with the provisions of this Act and the rules made thereunder.\n\n(2) For the purposes of this section, the expression \"incapacity\" means inability to exercise the rights of the Data Principal under the provisions of this Act or the rules made thereunder due to unsoundness of mind or infirmity of body.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "15",
+   "marginal_note": "Duties of Data Principal.",
+   "is_omitted": false,
+   "order_idx": 14,
+   "text_chars": 826,
+   "text_sha256": "b411106cbfc9cdbc69ea85d4abd641586950a074d05271823b7c610e5c55dbff",
+   "text_verbatim": "A Data Principal shall perform the following duties, namely:---\n\n(a) comply with the provisions of all applicable laws for the time being in force while exercising rights under the provisions of this Act;\n\n(b) to ensure not to impersonate another person while providing her personal data for a specified purpose;\n\n(c) to ensure not to suppress any material information while providing her personal data for any document, unique identifier, proof of identity or proof of address issued by the State or any of its instrumentalities;\n\n(d) to ensure not to register a false or frivolous grievance or complaint with a Data Fiduciary or the Board; and\n\n(e) to furnish only such information as is verifiably authentic, while exercising the right to correction or erasure under the provisions of this Act or the rules made thereunder.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "16",
+   "marginal_note": "Processing of personal data outside India.",
+   "is_omitted": false,
+   "order_idx": 15,
+   "text_chars": 507,
+   "text_sha256": "d335c73aada26cfc0a3a90bc01672d2c6072c0c9aa580674c0990a4be959ce6d",
+   "text_verbatim": "(1) The Central Government may, by notification, restrict the transfer of personal data by a Data Fiduciary for processing to such country or territory outside India as may be so notified.\n\n(2) Nothing contained in this section shall restrict the applicability of any law for the time being in force in India that provides for a higher degree of protection for or restriction on transfer of personal data by a Data Fiduciary outside India in relation to any personal data or Data Fiduciary or class thereof.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "17",
+   "marginal_note": "Exemptions.",
+   "is_omitted": false,
+   "order_idx": 16,
+   "text_chars": 4303,
+   "text_sha256": "28fb5efca5b4b779bc14e5a3221f316597b382c96eeb0e863126abaed33a698a",
+   "text_verbatim": "(1) The provisions of Chapter II, except sub-sections (1) and (5) of section 8, and those of Chapter III and section 16 shall not apply where---\n\n(a) the processing of personal data is necessary for enforcing any legal right or claim;\n\n(b) the processing of personal data by any court or tribunal or any other body in India which is entrusted by law with the performance of any judicial or quasi-judicial or regulatory or supervisory function, where such processing is necessary for the performance of such function;\n\n(c) personal data is processed in the interest of prevention, detection, investigation or prosecution of any offence or contravention of any law for the time being in force in India;\n\n(d) personal data of Data Principals not within the territory of India is processed pursuant to any contract entered into with any person outside the territory of India by any person based in India;\n\n(e) the processing is necessary for a scheme of compromise or arrangement or merger or amalgamation of two or more companies or a reconstruction by way of demerger or otherwise of a company, or transfer of undertaking of one or more company to another company, or involving division of one or more companies, approved by a court or tribunal or other authority competent to do so by any law for the time being in force; and\n\n(f) the processing is for the purpose of ascertaining the financial information and assets and liabilities of any person who has defaulted in payment due on account of a loan or advance taken from a financial institution, subject to such processing being in accordance with the provisions regarding disclosure of information or data in any other law for the time being in force.\n\nExplanation.--- For the purposes of this clause, the expressions \"default\" and \"financial institution\" shall have the meanings respectively assigned to them in sub-sections (12) and (14) of section 3 of the Insolvency and Bankruptcy Code, 2016 (31 of 2016). Illustrations.\n\nX, an individual, takes a loan from Y, a bank. X defaults in paying her monthly loan repayment instalment on the date on which it falls due. Y may process the personal data of X for ascertaining her financial information and assets and liabilities.\n\n(2) The provisions of this Act shall not apply in respect of the processing of personal data---\n\n(a) by such instrumentality of the State as the Central Government may notify, in the interests of sovereignty and integrity of India, security of the State, friendly relations with foreign States, maintenance of public order or preventing incitement to any cognizable offence relating to any of these, and the processing by the Central Government of any personal data that such instrumentality may furnish to it; and\n\n(b) necessary for research, archiving or statistical purposes if the personal data is not to be used to take any decision specific to a Data Principal and such processing is carried on in accordance with such standards as may be prescribed.\n\n(3) The Central Government may, having regard to the volume and nature of personal data processed, notify certain Data Fiduciaries or class of Data Fiduciaries, including startups, as Data Fiduciaries to whom the provisions of section 5, sub-sections (3) and (7) of section 8 and sections 10 and 11 shall not apply.\n\nExplanation.--- For the purposes of this sub-section, the term \"startup\" means a private limited company or a partnership firm or a limited liability partnership incorporated in India, which is eligible to be and is recognised as such in accordance with the criteria and process notified by the department to which matters relating to startups are allocated in the Central Government.\n\n(4) In respect of processing by the State or any instrumentality of the State, the provisions of subsection (7) of section 8 and sub-section (3) of section 12 and, where such processing is for a purpose that does not include making of a decision that affects the Data Principal, sub-section (2) of section 12 shall not apply.\n\n(5) The Central Government may, before expiry of five years from the date of commencement of this Act, by notification, declare that any provision of this Act shall not apply to such Data Fiduciary or classes of Data Fiduciaries for such period as may be specified in the notification.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "18",
+   "marginal_note": "Establishment of Board.",
+   "is_omitted": false,
+   "order_idx": 17,
+   "text_chars": 591,
+   "text_sha256": "c7af02a1719964976378e400662f049156d767708b55506a34135efd9ca380b1",
+   "text_verbatim": "(1) With effect from such date as the Central Government may, by notification, appoint, there shall be established, for the purposes of this Act, a Board to be called the Data Protection Board of India.\n\n(2) The Board shall be a body corporate by the name aforesaid, having perpetual succession and a common seal, with power, subject to the provisions of this Act, to acquire, hold and dispose of property, both movable and immovable, and to contract and shall, by the said name, sue or be sued.\n\n(3) The headquarters of the Board shall be at such place as the Central Government may notify.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "19",
+   "marginal_note": "Composition and qualifications for appointment of Chairperson and members.",
+   "is_omitted": false,
+   "order_idx": 18,
+   "text_chars": 783,
+   "text_sha256": "c1f77d16507c8131ac4aa36491b545f210c2040342e8ee16f44170186914b3d3",
+   "text_verbatim": "(1) The Board shall consist of a Chairperson and such number of other Members as the Central Government may notify.\n\n(2) The Chairperson and other Members shall be appointed by the Central Government in such manner as may be prescribed.\n\n(3) The Chairperson and other Members shall be a person of ability, integrity and standing who possesses special knowledge or practical experience in the fields of data governance, administration or implementation of laws related to social or consumer protection, dispute resolution, information and communication technology, digital economy, law, regulation or techno-regulation, or in any other field which in the opinion of the Central Government may be useful to the Board, and at least one among them shall be an expert in the field of law.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "20",
+   "marginal_note": "Salary, allowances payable to and term of office.",
+   "is_omitted": false,
+   "order_idx": 19,
+   "text_chars": 335,
+   "text_sha256": "3de3201eed687df32221a622d5f84fc9e10b25f436c3daeeb993736a08557006",
+   "text_verbatim": "(1) The salary, allowances and other terms and conditions of service of the Chairperson and other Members shall be such as may be prescribed, and shall not be varied to their disadvantage after their appointment.\n\n(2) The Chairperson and other Members shall hold office for a term of two years and shall be eligible for re-appointment.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "21",
+   "marginal_note": "Disqualifications for appointment and continuation as Chairperson and Members of Board.",
+   "is_omitted": false,
+   "order_idx": 20,
+   "text_chars": 726,
+   "text_sha256": "13a33837c8faf4720b45fb5fd91435477452b1ad87dc3066a31a50ec93fcdc21",
+   "text_verbatim": "(1) A person shall be disqualified for being appointed and continued as the Chairperson or a Member, if she---\n\n(a) has been adjudged as an insolvent;\n\n(b) has been convicted of an offence, which in the opinion of the Central Government, involves moral turpitude;\n\n(c) has become physically or mentally incapable of acting as a Member;\n\n(d) has acquired such financial or other interest, as is likely to affect prejudicially her functions as a Member; or\n\n(e) has so abused her position as to render her continuance in office prejudicial to the public interest.\n\n(2) The Chairperson or Member shall not be removed from her office by the Central Government unless she has been given an opportunity of being heard in the matter.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "22",
+   "marginal_note": "Resignation by Members and filling of vacancy.",
+   "is_omitted": false,
+   "order_idx": 21,
+   "text_chars": 1073,
+   "text_sha256": "1565fd13419c18505f711fe15a918654d867e6e1bb15954342e3e7c4ed0759b0",
+   "text_verbatim": "(1) The Chairperson or any other Member may give notice in writing to the Central Government of resigning from her office, and such resignation shall be effective from the date on which the Central Government permits her to relinquish office, or upon expiry of a period of three months from the date of receipt of such notice, or upon a duly appointed successor entering upon her office, or upon the expiry of the term of her office, whichever is earliest.\n\n(2) A vacancy caused by the resignation or removal or death of the Chairperson or any other Member, or otherwise, shall be filled by fresh appointment in accordance with the provisions of this Act.\n\n(3) The Chairperson and any other Member shall not, for a period of one year from the date on which they cease to hold such office, except with the previous approval of the Central Government, accept any employment, and shall also disclose to the Central Government any subsequent acceptance of employment with any Data Fiduciary against whom proceedings were initiated by or before such Chairperson or other Member.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "23",
+   "marginal_note": "Proceedings of Board.",
+   "is_omitted": false,
+   "order_idx": 22,
+   "text_chars": 829,
+   "text_sha256": "2b2664eba9978aa9f0cb750e8dd7d7fa8e725d41e218d55303397f312e614e9e",
+   "text_verbatim": "(1) The Board shall observe such procedure in regard to the holding of and transaction of business at its meetings, including by digital means, and authenticate its orders, directions and instruments in such manner as may be prescribed.\n\n(2) No act or proceeding of the Board shall be invalid merely by reason of---\n\n(a) any vacancy in or any defect in the constitution of the Board;\n\n(b) any defect in the appointment of a person acting as the Chairperson or other Member of the Board; or\n\n(c) any irregularity in the procedure of the Board, which does not affect the merits of the case.\n\n(3) When the Chairperson is unable to discharge her functions owing to absence, illness or any other cause, the senior-most Member shall discharge the functions of the Chairperson until the date on which the Chairperson resumes her duties.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "24",
+   "marginal_note": "Officers and employees of Board.",
+   "is_omitted": false,
+   "order_idx": 23,
+   "text_chars": 282,
+   "text_sha256": "90ea0facfa181b243d0969e87fcbe3ce20fe0ea755d4dab1b051a664f2d00d92",
+   "text_verbatim": "The Board may, with previous approval of the Central Government, appoint such officers and employees as it may deem necessary for the efficient discharge of its functions under the provisions of this Act, on such terms and conditions of appointment and service as may be prescribed.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "25",
+   "marginal_note": "Members and officers to be public servants.",
+   "is_omitted": false,
+   "order_idx": 24,
+   "text_chars": 245,
+   "text_sha256": "a75c68b833b4f9d7f085e5edd1d44a43f5b52a5178570408c343e9a516209da8",
+   "text_verbatim": "The Chairperson, Members, officers and employees of the Board shall be deemed, when acting or purporting to act in pursuance of provisions of this Act, to be public servants within the meaning of section 21 of the Indian Penal Code (45 of 1860).",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "26",
+   "marginal_note": "Powers of Chairperson.",
+   "is_omitted": false,
+   "order_idx": 25,
+   "text_chars": 490,
+   "text_sha256": "792e8c29bf1474ca7175820f00b11607fe79fd225928ed73ef0d0d30e21d5285",
+   "text_verbatim": "The Chairperson shall exercise the following powers, namely:---\n\n(a) general superintendence and giving direction in respect of all administrative matters of the Board;\n\n(b) authorise any officer of the Board to scrutinise any intimation, complaint, reference or correspondence addressed to the Board; and\n\n(c) authorise performance of any of the functions of the Board and conduct any of its proceedings, by an individual Member or groups of Members and to allocate proceedings among them.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "27",
+   "marginal_note": "Powers and functions of Board.",
+   "is_omitted": false,
+   "order_idx": 26,
+   "text_chars": 2149,
+   "text_sha256": "eb8e34d938535fcea9b618e4a4a1fc4043c6752c5c3757e34c864329652e1bdf",
+   "text_verbatim": "(1) The Board shall exercise and perform the following powers and functions, namely:---\n\n(a) on receipt of an intimation of personal data breach under sub-section (6) of section 8, to direct any urgent remedial or mitigation measures in the event of a personal data breach, and to inquire into such personal data breach and impose penalty as provided in this Act;\n\n(b) on a complaint made by a Data Principal in respect of a personal data breach or a breach in observance by a Data Fiduciary of its obligations in relation to her personal data or the exercise of her rights under the provisions of this Act, or on a reference made to it by the Central Government or a State Government, or in compliance of the directions of any court, to inquire into such breach and impose penalty as provided in this Act;\n\n(c) on a complaint made by a Data Principal in respect of a breach in observance by a Consent Manager of its obligations in relation to her personal data, to inquire into such breach and impose penalty as provided in this Act;\n\n(d) on receipt of an intimation of breach of any condition of registration of a Consent Manager, to inquire into such breach and impose penalty as provided in this Act; and\n\n(e) on a reference made by the Central Government in respect of the breach in observance of the provisions of sub-section (2) of section 37 by an intermediary, to inquire into such breach and impose penalty as provided in this Act.\n\n(2) The Board may, for the effective discharge of its functions under the provisions of this Act, after giving the person concerned an opportunity of being heard and after recording reasons in writing, issue such directions as it may consider necessary to such person, who shall be bound to comply with the same.\n\n(3) The Board may, on a representation made to it by a person affected by a direction issued under sub-section (1) or sub-section (2), or on a reference made by the Central Government, modify, suspend, withdraw or cancel such direction and, while doing so, impose such conditions as it may deem fit, subject to which the modification, suspension, withdrawal or cancellation shall have effect.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "28",
+   "marginal_note": "Procedure to be followed by Board.",
+   "is_omitted": false,
+   "order_idx": 27,
+   "text_chars": 2816,
+   "text_sha256": "73b576dc9613e41fcc1ed5a70248954add70ab6c99671f77a76f0e21eb5919da",
+   "text_verbatim": "(1) The Board shall function as an independent body and shall, as far as practicable, function as a digital office, with the receipt of complaints and the allocation, hearing and pronouncement of decisions in respect of the same being digital by design, and adopt such techno-legal measures as may be prescribed.\n\n(2) The Board may, on receipt of an intimation or complaint or reference or directions as referred to in sub-section (1) of section 27, take action in accordance with the provisions of this Act and the rules made thereunder.\n\n(3) The Board shall determine whether there are sufficient grounds to proceed with an inquiry.\n\n(4) In case the Board determines that there are insufficient grounds, it may, for reasons to be recorded in writing, close the proceedings.\n\n(5) In case the Board determines that there are sufficient grounds to proceed with inquiry, it may, for reasons to be recorded in writing, inquire into the affairs of any person for ascertaining whether such person is complying with or has complied with the provisions of this Act.\n\n(6) The Board shall conduct such inquiry following the principles of natural justice and shall record reasons for its actions during the course of such inquiry.\n\n(7) For the purposes of discharging its functions under this Act, the Board shall have the same powers as are vested in a civil court under the Code of Civil Procedure, 1908 (5 of 1908), in respect of matters relating to---\n\n(a) summoning and enforcing the attendance of any person and examining her on oath;\n\n(b) receiving evidence of affidavit requiring the discovery and production of documents;\n\n(c) inspecting any data, book, document, register, books of account or any other document; and\n\n(d) such other matters as may be prescribed.\n\n(8) The Board or its officers shall not prevent access to any premises or take into custody any equipment or any item that may adversely affect the day-to-day functioning of a person.\n\n(9) The Board may require the services of any police officer or any officer of the Central Government or a State Government to assist it for the purposes of this section and it shall be the duty of every such officer to comply with such requisition.\n\n(10) During the course of the inquiry, if the Board considers it necessary, it may for reasons to be recorded in writing, issue interim orders after giving the person concerned an opportunity of being heard.\n\n(11) On completion of the inquiry and after giving the person concerned an opportunity of being heard, the Board may for reasons to be recorded in writing, either close the proceedings or proceed in accordance with section 33.\n\n(12) At any stage after receipt of a complaint, if the Board is of the opinion that the complaint is false or frivolous, it may issue a warning or impose costs on the complainant.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "29",
+   "marginal_note": "Appeal to Appellate Tribunal.",
+   "is_omitted": false,
+   "order_idx": 28,
+   "text_chars": 2191,
+   "text_sha256": "cdff23985e3e37cd02e427148a33260a11e1126745cdc9b5e595b9a1cf861854",
+   "text_verbatim": "(1) Any person aggrieved by an order or direction made by the Board under this Act may prefer an appeal before the Appellate Tribunal.\n\n(2) Every appeal under sub-section (1) shall be filed within a period of sixty days from the date of receipt of the order or direction appealed against and it shall be in such form and manner and shall be accompanied by such fee as may be prescribed.\n\n(3) The Appellate Tribunal may entertain an appeal after the expiry of the period specified in subsection (2), if it is satisfied that there was sufficient cause for not preferring the appeal within that period.\n\n(4) On receipt of an appeal under sub-section (1), the Appellate Tribunal may, after giving the parties to the appeal, an opportunity of being heard, pass such orders thereon as it thinks fit, confirming, modifying or setting aside the order appealed against.\n\n(5) The Appellate Tribunal shall send a copy of every order made by it to the Board and to the parties to the appeal.\n\n(6) The appeal filed before the Appellate Tribunal under sub-section (1) shall be dealt with by it as expeditiously as possible and endeavour shall be made by it to dispose of the appeal finally within six months from the date on which the appeal is presented to it.\n\n(7) Where any appeal under sub-section (6) could not be disposed of within the period of six months, the Appellate Tribunal shall record its reasons in writing for not disposing of the appeal within that period.\n\n(8) Without prejudice to the provisions of section 14A and section 16 of the Telecom Regulatory Authority of India Act, 1997 (24 of 1997), the Appellate Tribunal shall deal with an appeal under this section in accordance with such procedure as may be prescribed.\n\n(9) Where an appeal is filed against the orders of the Appellate Tribunal under this Act, the provisions of section 18 of the Telecom Regulatory Authority of India Act, 1997 (24 of 1997) shall apply.\n\n(10) In respect of appeals filed under the provisions of this Act, the Appellate Tribunal shall, as far as practicable, function as a digital office, with the receipt of appeal, hearing and pronouncement of decisions in respect of the same being digital by design.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "30",
+   "marginal_note": "Orders passed by Appellate Tribunal to be executable as decree.",
+   "is_omitted": false,
+   "order_idx": 29,
+   "text_chars": 451,
+   "text_sha256": "315f8e3376f8b6518ee7da0ca3f4aee85939dd165021c2119947aa31beb99fc3",
+   "text_verbatim": "(1) An order passed by the Appellate Tribunal under this Act shall be executable by it as a decree of civil court, and for this purpose, the Appellate Tribunal shall have all the powers of a civil court.\n\n(2) Notwithstanding anything contained in sub-section (1), the Appellate Tribunal may transmit any order made by it to a civil court having local jurisdiction and such civil court shall execute the order as if it were a decree made by that court.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "31",
+   "marginal_note": "Alternate dispute resolution.",
+   "is_omitted": false,
+   "order_idx": 30,
+   "text_chars": 303,
+   "text_sha256": "6c4833aa8d11b12c356cd2a35af05bbaef8097f739ffd71d7d3b9f81dc6c6c7c",
+   "text_verbatim": "If the Board is of the opinion that any complaint may be resolved by mediation, it may direct the parties concerned to attempt resolution of the dispute through such mediation by such mediator as the parties may mutually agree upon, or as provided for under any law for the time being in force in India.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "32",
+   "marginal_note": "Voluntary undertaking.",
+   "is_omitted": false,
+   "order_idx": 31,
+   "text_chars": 1142,
+   "text_sha256": "a3d79999d811550cd9e158f457e49b303802bec9fc9650b188b189075a4f4e84",
+   "text_verbatim": "(1) The Board may accept a voluntary undertaking in respect of any matter related to observance of the provisions of this Act from any person at any stage of a proceeding under section 28.\n\n(2) The voluntary undertaking referred to in sub-section (1) may include an undertaking to take such action within such time as may be determined by the Board, or refrain from taking such action, and or publicising such undertaking.\n\n(3) The Board may, after accepting the voluntary undertaking and with the consent of the person who gave the voluntary undertaking vary the terms included in the voluntary undertaking.\n\n(4) The acceptance of the voluntary undertaking by the Board shall constitute a bar on proceedings under the provisions of this Act as regards the contents of the voluntary undertaking, except in cases covered by sub-section (5).\n\n(5) Where a person fails to adhere to any term of the voluntary undertaking accepted by the Board, such breach shall be deemed to be breach of the provisions of this Act and the Board may, after giving such person an opportunity of being heard, proceed in accordance with the provisions of section 33.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "33",
+   "marginal_note": "Penalties.",
+   "is_omitted": false,
+   "order_idx": 32,
+   "text_chars": 1094,
+   "text_sha256": "2b2d3440d899350e7b4980094e9ba367daa65b98a745a48c2da50b38de6d9649",
+   "text_verbatim": "(1) If the Board determines on conclusion of an inquiry that breach of the provisions of this Act or the rules made thereunder by a person is significant, it may, after giving the person an opportunity of being heard, impose such monetary penalty specified in the Schedule.\n\n(2) While determining the amount of monetary penalty to be imposed under sub-section (1), the Board shall have regard to the following matters, namely:---\n\n(a) the nature, gravity and duration of the breach;\n\n(b) the type and nature of the personal data affected by the breach;\n\n(c) repetitive nature of the breach;\n\n(d) whether the person, as a result of the breach, has realised a gain or avoided any loss;\n\n(e) whether the person took any action to mitigate the effects and consequences of the breach, and the timeliness and effectiveness of such action;\n\n(f) whether the monetary penalty to be imposed is proportionate and effective, having regard to the need to secure observance of and deter breach of the provisions of this Act; and\n\n(g) the likely impact of the imposition of the monetary penalty on the person.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "34",
+   "marginal_note": "Crediting sums realised by way of penalties to Consolidated Fund of India.",
+   "is_omitted": false,
+   "order_idx": 33,
+   "text_chars": 127,
+   "text_sha256": "9a029b17f3164fb59e735f7e6577fdd18718257d20f6075a127cf73f7bc112c6",
+   "text_verbatim": "All sums realised by way of penalties imposed by the Board under this Act, shall be credited to the Consolidated Fund of India.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "35",
+   "marginal_note": "Protection of action taken in good faith.",
+   "is_omitted": false,
+   "order_idx": 34,
+   "text_chars": 287,
+   "text_sha256": "568eef284259689dfb5e80eec361202f0caf63dd98140c24b902e5a95f1e9e90",
+   "text_verbatim": "No suit, prosecution or other legal proceedings shall lie against the Central Government, the Board, its Chairperson and any Member, officer or employee thereof for anything which is done or intended to be done in good faith under the provisions of this Act or the rules made thereunder.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "36",
+   "marginal_note": "Power to call for information.",
+   "is_omitted": false,
+   "order_idx": 35,
+   "text_chars": 162,
+   "text_sha256": "b6bfe772a5bd63c0e4bf69966def19ac0776ff97e15f73811cf29b23bb87af24",
+   "text_verbatim": "The Central Government may, for the purposes of this Act, require the Board and any Data Fiduciary or intermediary to furnish such information as it may call for.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "37",
+   "marginal_note": "Power of Central Government to issue directions.",
+   "is_omitted": false,
+   "order_idx": 36,
+   "text_chars": 1332,
+   "text_sha256": "28235dcf743365355582937ef5a200a10e53565e95b7ead4ea3b74624207ae8a",
+   "text_verbatim": "(1) The Central Government or any of its officers specially authorised by it in this behalf may, upon receipt of a reference in writing from the Board that---\n\n(a) intimates the imposition of monetary penalty by the Board on a Data Fiduciary in two or more instances; and\n\n(b) advises, in the interests of the general public, the blocking for access by the public to any information generated, transmitted, received, stored or hosted, in any computer resource that enables such Data Fiduciary to carry on any activity relating to offering of goods or services to Data Principals within the territory of India,\n\nafter giving an opportunity of being heard to that Data Fiduciary, on being satisfied that it is necessary or expedient so to do, in the interests of the general public, for reasons to be recorded in writing, by order, direct any agency of the Central Government or any intermediary to block for access by the public or cause to be blocked for access by the public any such information.\n\n(2) Every intermediary who receives a direction issued under sub-section (1) shall be bound to comply with the same.\n\n(3) For the purposes of this section, the expressions \"computer resource\", \"information\" and \"intermediary\" shall have the meanings respectively assigned to them in the Information Technology Act, 2000 (21 of 2000).",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "38",
+   "marginal_note": "Consistency with other laws.",
+   "is_omitted": false,
+   "order_idx": 37,
+   "text_chars": 322,
+   "text_sha256": "0797b6de3820d2080985248f58e675af7be724f2b4dc1b26697839830db946f7",
+   "text_verbatim": "(1) The provisions of this Act shall be in addition to and not in derogation of any other law for the time being in force.\n\n(2) In the event of any conflict between a provision of this Act and a provision of any other law for the time being in force, the provision of this Act shall prevail to the extent of such conflict.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "39",
+   "marginal_note": "Bar of jurisdiction.",
+   "is_omitted": false,
+   "order_idx": 38,
+   "text_chars": 342,
+   "text_sha256": "2d8abc5d0fda5c746004461a34ab257ca1cd75baeac970a00979abf78276af42",
+   "text_verbatim": "No civil court shall have the jurisdiction to entertain any suit or proceeding in respect of any matter for which the Board is empowered under the provisions of this Act and no injunction shall be granted by any court or other authority in respect of any action taken or to be taken in pursuance of any power under the provisions of this Act.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "40",
+   "marginal_note": "Power to make rules.",
+   "is_omitted": false,
+   "order_idx": 39,
+   "text_chars": 3655,
+   "text_sha256": "9ca05587ad22506ac601efd4a2ba2ed7cb9cc2ac8f9a3ed8423641e209d5cf6c",
+   "text_verbatim": "(1) The Central Government may, by notification, and subject to the condition of previous publication, make rules not inconsistent with the provisions of this Act, to carry out the purposes of this Act.\n\n(2) In particular and without prejudice to the generality of the foregoing power, such rules may provide for all or any of the following matters, namely:---\n\n(a) the manner in which the notice given by the Data Fiduciary to a Data Principal shall inform her, under sub-section (1) of section 5;\n\n(b) the manner in which the notice given by the Data Fiduciary to a Data Principal shall inform her, under sub-section (2) of section 5;\n\n(c) the manner of accountability and the obligations of Consent Manager under sub-section (8) of section 6;\n\n(d) the manner of registration of Consent Manager and the conditions relating thereto, under sub-section (9) of section 6;\n\n(e) the subsidy, benefit, service, certificate, licence or permit for the provision or issuance of which, personal data may be processed under clause (b) of section 7;\n\n(f) the form and manner of intimation of personal data breach to the Board under sub-section (6) of section 8;\n\n(g) the time period for the specified purpose to be deemed as no longer being served, under sub-section (8) of section 8;\n\n(h) the manner of publishing the business contact information of a Data Protection Officer under sub-section (9) of section 8;\n\n(i) the manner of obtaining verifiable consent under sub-section (1) of section 9;\n\n(j) the classes of Data Fiduciaries, the purposes of processing of personal data of a child and the conditions relating thereto, under sub-section (4) of section 9;\n\n(k) the other matters comprising the process of Data Protection Impact Assessment under sub-clause (i) of clause (c) of sub-section (2) of section 10;\n\n(l) the other measures that the Significant Data Fiduciary shall undertake under sub-clause (iii) of clause (c) of sub-section (2) of section 10;\n\n(m) the manner in which a Data Principal shall make a request to the Data Fiduciary to obtain information and any other information related to the personal data of such Data Principal and its processing, under sub-section (1) of section 11;\n\n(n) the manner in which a Data Principal shall make a request to the Data Fiduciary for erasure of her personal data under sub-section (3) of section 12;\n\n(o) the period within which the Data Fiduciary shall respond to any grievances under sub-section (2) of section 13;\n\n(p) the manner of nomination of any other individual by the Data Principal under sub-section (1) of section 14;\n\n(q) the standards for processing the personal data for exemption under clause (b) of sub-section (2) of section 17;\n\n(r) the manner of appointment of the Chairperson and other Members of the Board under sub-section (2) of section 19;\n\n(s) the salary, allowances and other terms and conditions of services of the Chairperson and other Members of the Board under sub-section (1) of section 20;\n\n(t) the manner of authentication of orders, directions and instruments under sub-section (1) of section 23;\n\n(u) the terms and conditions of appointment and service of officers and employees of the Board under section 24;\n\n(v) the techno-legal measures to be adopted by the Board under sub-section (1) of section 28;\n\n(w) the other matters under clause (d) of sub-section (7) of section 28;\n\n(x) the form, manner and fee for filing an appeal under sub-section (2) of section 29;\n\n(y) the procedure for dealing an appeal under sub-section (8) of section 29;\n\n(z) any other matter which is to be or may be prescribed or in respect of which provision is to be, or may be, made by rules.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "41",
+   "marginal_note": "Laying of rules and certain notification.",
+   "is_omitted": false,
+   "order_idx": 40,
+   "text_chars": 852,
+   "text_sha256": "5249aaf9f6036ab3936544cf99dd5ba1b98c928fd0ee4b3f98c607d9f0dc0b27",
+   "text_verbatim": "Every rule made and every notification issued under section 16 and section 42 of this Act shall be laid, as soon as may be after it is made, before each House of Parliament, while it is in session, for a total period of thirty days which may be comprised in one session or in two or more successive sessions, and if before the expiry of the session immediately following the session or the successive sessions aforesaid, both Houses agree in making any modification in the rule or notification or both Houses agree that the rule or notification should not be made or issued, the rule or notification shall thereafter have effect only in such modified form or be of no effect, as the case may be; so, however, that any such modification or annulment shall be without prejudice to the validity of anything previously done under that rule or notification.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "42",
+   "marginal_note": "Power to amend Schedule.",
+   "is_omitted": false,
+   "order_idx": 41,
+   "text_chars": 425,
+   "text_sha256": "cd4d35c2b562d97424d4223b8c10b89c5434a8d761c4a25c603c96dd516ba320",
+   "text_verbatim": "(1) The Central Government may, by notification, amend the Schedule, subject to the restriction that no such notification shall have the effect of increasing any penalty specified therein to more than twice of what was specified in it when this Act was originally enacted.\n\n(2) Any amendment notified under sub-section (1) shall have effect as if enacted in this Act and shall come into force on the date of the notification.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "43",
+   "marginal_note": "Power to remove difficulties.",
+   "is_omitted": false,
+   "order_idx": 42,
+   "text_chars": 558,
+   "text_sha256": "c522695ec8ff8c05e28a3ee7ba82ffb10286ab08cec530cd8f45cd34f3549cea",
+   "text_verbatim": "(1) If any difficulty arises in giving effect to the provisions of this Act, the Central Government may, by order published in the Official Gazette, make such provisions not inconsistent with the provisions of this Act as may appear to it to be necessary or expedient for removing the difficulty.\n\n(2) No order as referred to in sub-section (1) shall be made after the expiry of three years from the date of commencement of this Act.\n\n(3) Every order made under this section shall be laid, as soon as may be after it is made, before each House of Parliament.",
+   "footnotes": [],
+   "amendment_note": null
+  },
+  {
+   "section_no": "44",
+   "marginal_note": "Amendments to certain Acts.",
+   "is_omitted": false,
+   "order_idx": 43,
+   "text_chars": 1108,
+   "text_sha256": "4e2aea1ebfa395d2245378e25079f568aad71d0999218740ab7ac2dd1de0e691",
+   "text_verbatim": "(1) In section 14 of the Telecom Regulatory Authority of India Act, 1997 (24 of 1997), in clause (c), for sub-clauses (i) and (ii), the following sub-clauses shall be substituted, namely:---\n\n\"(i) the Appellate Tribunal under the Information Technology Act, 2000 (21 of 2000);\n\n(ii) the Appellate Tribunal under the Airports Economic Regulatory Authority of India Act, 2008 (27 of 2008); and\n\n(iii) the Appellate Tribunal under the Digital Personal Data Protection Act, 2023.\".\n\n(2) The Information Technology Act, 2000 (21 of 2000) shall be amended in the following manner, namely:---\n\n(a) section 43A shall be omitted;\n\n(b) in section 81, in the proviso, after the words and figures \"the Patents Act, 1970 (39 of 1970)\", the words and figures \"or the Digital Personal Data Protection Act, 2023\" shall be inserted; and\n\n(c) in section 87, in sub-section (2), clause (ob) shall be omitted.\n\n(3) In section 8 of the Right to Information Act, 2005 (22 of 2005), in sub-section (1), for clause (j), the following clause shall be substituted, namely:---\n\n\"(j) information which relates to personal information;\".",
+   "footnotes": [],
+   "amendment_note": null
+  }
+ ]
+}
