@@ -14,8 +14,8 @@ relied on — and an honest refusal when the corpus does not cover the question.
 
 ## What works so far
 
-Stage 0 of ten is complete. See [docs/BUILD-LOG.md](docs/BUILD-LOG.md) for the
-running record and what each stage delivered.
+Stages 0 and 1 of ten are complete. See [docs/BUILD-LOG.md](docs/BUILD-LOG.md)
+for the running record and what each stage delivered.
 
 | Capability | State |
 |---|---|
@@ -23,7 +23,8 @@ running record and what each stage delivered.
 | `GET /v1/health` — version, DB connectivity, corpus counts | working |
 | `GET /metrics` — Prometheus | working |
 | `legaledge-kb version` / `check-config` | working |
-| Database schema and migrations | Stage 1 |
+| Citation-correct section ordering (`section_no_sort`) | working |
+| Database schema and migrations (10 tables, pgvector, HNSW + GIN) | working |
 | Corpus fetch / parse / index | Stages 2–4 |
 | Corpus read API, auth, retrieval, `POST /v1/ask` | Stages 5–8 |
 
@@ -38,11 +39,14 @@ cp .env.example .env
 #   python -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())"
 #                                                               -> CREDENTIAL_ENC_KEY
 docker compose up -d --build
+docker compose exec api alembic upgrade head
 curl -s localhost:8000/v1/health | python3 -m json.tool
 ```
 
-A healthy, empty deployment answers `200` with `"status": "ok"`,
-`"schema_ready": false` (no migrations yet) and zero corpus counts. If PostgreSQL
+A healthy, migrated deployment answers `200` with `"status": "ok"`,
+`"schema_ready": true` and zero corpus counts (nothing is ingested until Stage 2).
+Before the migration runs, `"schema_ready"` is `false` — that is how you tell an
+un-migrated stack from a broken one. If PostgreSQL
 is unreachable the endpoint answers `503` with `"status": "degraded"` — a deploy
 probe must never read a broken dependency as healthy.
 
@@ -92,6 +96,19 @@ is generated from it. After changing a dependency:
 python scripts/sync_requirements.py
 ```
 
+## Migrations
+
+```bash
+alembic upgrade head          # apply
+alembic downgrade base        # roll back (drops every table and the extension)
+alembic current               # show the applied revision
+alembic revision --autogenerate -m "what changed"
+```
+
+The URL comes from `DATABASE_URL` via `Settings`, not from `alembic.ini`. Head is
+`0001`. Section ordering is by `section_no_sort`, never by `section_no` — see
+[docs/adr/0003](docs/adr/0003-identifiers-and-citation-ordering.md).
+
 ## Run the CLI
 
 ```bash
@@ -112,8 +129,19 @@ mypy
 pytest -q
 ```
 
-Tests that need PostgreSQL skip themselves when `DATABASE_URL` is unreachable;
-CI always provides one, so nothing is silently unverified there.
+Database-backed tests create a uniquely named throwaway database, migrate it with
+the real Alembic migration (not `create_all`), and drop it afterwards — so the
+suite is repeatable and never inherits its own leftovers. They skip themselves
+when `DATABASE_URL` is unreachable; CI always provides one, so nothing is
+silently unverified there.
+
+On a machine whose 5432 is already taken, run the stack on another port and point
+the tests at it:
+
+```bash
+POSTGRES_PORT=5433 docker compose up -d
+DATABASE_URL=postgresql://legaledge:legaledge@localhost:5433/legaledge pytest -q
+```
 
 ## Retrieval models
 
