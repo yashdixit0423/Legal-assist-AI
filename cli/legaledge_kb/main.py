@@ -328,11 +328,24 @@ def check_config() -> None:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    secret_fields = {"JWT_SECRET", "CREDENTIAL_ENC_KEY", "LANGFUSE_SECRET_KEY", "SENTRY_DSN"}
+    # Anything that is a credential. LLM_API_KEY was missing from this set and
+    # would have been printed in full by the one command a user runs right
+    # after setting it. Derived by name as well as by list, so the next
+    # credential someone adds is redacted by default rather than by memory.
+    secret_fields = {
+        "JWT_SECRET",
+        "CREDENTIAL_ENC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "SENTRY_DSN",
+        "LLM_API_KEY",
+        "REDIS_URL",
+        "DATABASE_URL",
+    }
+    secret_suffixes = ("_KEY", "_SECRET", "_TOKEN", "_PASSWORD", "_DSN", "_URL")
     table = Table("setting", "value", title="Effective configuration")
     for name in sorted(type(settings).model_fields):
         value = getattr(settings, name)
-        if name in secret_fields:
+        if name in secret_fields or name.endswith(secret_suffixes):
             table.add_row(name, "[dim]set[/dim]" if value else "[yellow]unset[/yellow]")
         else:
             table.add_row(name, str(value))
