@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # -- generation --------------------------------------------------------
     # One key, read from the environment. The BYOK vault is Stage 7; until then
     # an unset key produces a typed 402, never a 500.
-    LLM_MODEL: str = "anthropic/claude-sonnet-4-5"
+    LLM_MODEL: str = "openai/gpt-4.1-mini"
     LLM_API_KEY: str = ""
     LLM_TEMPERATURE: float = Field(default=0.0, ge=0.0, le=2.0)
     LLM_MAX_OUTPUT_TOKENS: int = Field(default=1200, ge=64, le=16_000)

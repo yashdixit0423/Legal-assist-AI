@@ -1780,3 +1780,95 @@ recall@6 = 94.4% should be quoted as such. To get bge's numbers, one of:
 4. Run it on a machine with more than 8 GB.
 
 Option 1 is the cheap one and needs thirty seconds of the owner's time.
+
+---
+
+## 2026-09-11 · Stages 4 and 6 verified — and a hole in the citation validator
+
+A provider key was supplied, so the model half of the pipeline ran for the
+first time. **Stages 4 and 6 are now verified end to end.** The run also found
+the most serious defect of this build.
+
+### The key was OpenAI, not Anthropic
+
+`LLM_API_KEY` was set to an `sk-proj-…` key. Probed against Anthropic it
+returned `provider_key_invalid`; against OpenAI it worked. `LLM_MODEL` is now
+`openai/gpt-4.1-mini` in `.env`, `.env.example` and the config default.
+Nothing else changed — LiteLLM routes by model id, so the pipeline, prompt and
+validator were untouched. Worth noting that the Stage 7 verify endpoint
+diagnosed this correctly and typed it, which is what it is for.
+
+### Fixed first: `check-config` was printing the key
+
+The secret list in `check-config` predated `LLM_API_KEY` and never gained it,
+so the one command a user runs immediately after setting a provider key printed
+that key to the terminal. `DATABASE_URL` and `REDIS_URL` were exposed the same
+way and both carry passwords. Redaction is now by name suffix (`_KEY`,
+`_SECRET`, `_TOKEN`, `_PASSWORD`, `_DSN`, `_URL`) as well as by list, so the
+next credential someone adds is hidden by default rather than by memory.
+
+### The citation validator was ignoring citations it should have checked
+
+Spec §05 calls step 8 "the most important twenty lines in this phase". It had a
+hole, and only a live model found it. `gpt-4.1-mini` wrote:
+
+```
+...must be registered compulsorily [S18(1)(d), S1107].
+...may be registered optionally [S19(c)].
+```
+
+The pattern was `\[S(\d{1,12})\]` — the closing bracket had to follow the
+digits immediately. So `[S19(c)]` **was not recognised as a citation at all**,
+and in `[S18(1)(d), S1107]` only the trailing id was checked.
+
+In this instance the model was right: section id 19 is Registration Act s.18,
+*Documents of which registration is optional*, which is exactly the provision
+for a lease under one year. The answer was correct. **But a fabricated
+`[S9999(c)]` would have passed validation in silence and been reported as a
+clean, grounded answer** — the precise failure this module exists to prevent,
+and the one metric spec §10 says must be zero rather than merely good.
+
+Now: every bracketed group is scanned for `S<digits>` and every id found is
+validated. `[S19(c)]`, `[S18(1)(d), S1107]` and `[ S1046 ]` all resolve;
+India Code's own `[1]` and `[2][State Government]` markers still do not, which
+is why the scheme carries a letter prefix. A bare `S1046` outside brackets is
+deliberately still not counted — an answer using only bare forms reads as
+uncited and is regenerated, which fails closed.
+
+Six regression tests were added from the forms the live model actually
+produced, including the fabricated sub-clause pointer. The prompt now also asks
+for one id per bracket and is bumped to `ask-v2` — but the prompt is a request
+and the validator is the guarantee, so it was fixed on both sides.
+
+**The lesson, narrowly:** the validator had ten unit tests and they all passed,
+because they tested the citation forms *I* imagined. The forms a model actually
+emits were not among them. Unit tests written by the same person who wrote the
+regex cannot find that class of bug; one real generation did, immediately.
+
+### Evidence — live, `openai/gpt-4.1-mini`, mini reranker
+
+| Question | Result |
+|---|---|
+| "When must a lease of immoveable property be registered?" | **answered**, top 0.9847, cited `[S18]` Registration s.17 + `[S1107]` TPA s.107 *Leases how made*, 11137/189 tokens, 8.2 s, no violation |
+| "What notice terminates a lease for agricultural purposes?" | **answered**, top 0.989, cited `[S1106]` TPA s.106 — six months' notice, correctly quoted, 926/116 tokens, 4.5 s |
+| "Is a non-compete after leaving employment enforceable?" | **abstained**, top 0.0629 — the vocabulary gap from Stage 4, unchanged |
+| "capital gains tax rate on a flat in Mumbai" | **abstained**, top 0.006, no model call |
+| "what did the Supreme Court hold in Kesavananda Bharati" | **abstained**, top 0.0094, no model call |
+
+SSE: `sources → token × 230 → citation → done`, 1033 streamed characters,
+`prompt_version: ask-v2`, `citation_violation: false`.
+
+**Fabricated citations across this run: zero.** That is five questions, not the
+300 spec §10 asks for, so it is evidence rather than a measurement — but it is
+the first evidence that exists for the claim at all.
+
+### What this closes, and what it does not
+
+- **Stage 4 ✅** — generation and citation validation verified against a real
+  model.
+- **Stage 6 ✅** — real streamed `token` events, correct event sequence.
+- **Still not measured:** citation correctness (spec §10 wants human scoring of
+  150 answers) and the fabricated-citation rate over 300 questions. The
+  `invalidated` → retry path has still never fired, because the model has not
+  yet produced a bad citation — it cannot be forced without a stub, and a stub
+  would only re-test the unit tests.

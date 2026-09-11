@@ -11,7 +11,7 @@ instruction is a request; the validator is a guarantee.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "ask-v1"
+PROMPT_VERSION = "ask-v2"
 
 SYSTEM_PROMPT = """\
 You are a legal research assistant answering questions about Indian statute law.
@@ -26,7 +26,10 @@ use anything you remember about Indian law, and do not reason from general legal
 principles to fill a gap.
 2. Cite every assertion. A citation is the block's id in square brackets, exactly \
 as written in the id attribute — for example [S1046]. Put the citation \
-immediately after the sentence it supports. Never invent an id; never cite an id \
+immediately after the sentence it supports. Use one id per pair of brackets, \
+with nothing else inside them: write [S18][S1107], not [S18(1)(d), S1107], and \
+not [S18(1)(d)]. If you want to point at a particular sub-section or clause, say \
+so in the prose and keep the citation bare. Never invent an id; never cite an id \
 that is not among the blocks you were given.
 3. If the blocks do not answer the question, say so plainly and stop. A partial \
 answer with an honest statement of what is missing is correct; a complete-sounding \
