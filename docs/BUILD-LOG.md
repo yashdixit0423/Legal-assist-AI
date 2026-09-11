@@ -1710,3 +1710,73 @@ cosmetic and started blocking: `docker compose up -d postgres` read
 `.env.example` keeps 5432 for CI. The corpus survived the container recreation
 intact (6 Acts, 778 sections, 877/877 embedded, 503 links) because the data is
 in a named volume, not the container.
+
+---
+
+## 2026-09-11 · Post-Stage-9 — conftest port, image rebuild, and bge measured
+
+### Fixed: 15 tests were skipping silently
+
+`tests/conftest.py` hardcoded port 5432 for the throwaway test databases. On a
+machine whose Postgres is on 5433, that pointed at an unrelated server with no
+`legaledge` role, and **15 database-backed tests skipped without failing** —
+including the `section_no_sort` ordering suite, one of the four things that are
+supposed to have a full suite. A green run that quietly tests less than it
+claims is worse than a red one.
+
+The host and port are now derived from the developer's own `DATABASE_URL` in
+`.env`, with the database name replaced; an explicit `DATABASE_URL` in the
+environment still wins. **200 passed** with nothing exported, against 185
+passed / 15 skipped before.
+
+### Rebuilt: `legaledge-api:stage9`
+
+The only image was `stage4`, missing Stages 5 to 9. Rebuilt and verified from
+inside the container: `alembic current` → `0001 (head)`, all 14 `/v1` routes
+present, `HF_HOME`/`MODEL_CACHE_DIR` both `/models`.
+
+### Measured: `bge-reranker-v2-m3` cannot run the gold set on this machine
+
+A 20-case probe was run before committing to the full set, precisely because
+the 29-minute figure was extrapolated arithmetic rather than a measurement.
+It was wrong by **7×**:
+
+| | Predicted | Measured |
+|---|---:|---:|
+| per case | 12.5 s | **88 s** |
+| full 139 | 29 min | **203 min, and degrading** |
+
+Cause, measured not inferred: process state `U` (uninterruptible wait), resident
+set collapsed to 2 MB, **3.95 GB of 5.12 GB swap in use**, 0.64 GB free. bge is
+2.1 GB against mini's 0.47 GB, and with Docker Desktop reserving up to 3.8 GB on
+an 8 GB host there is no room for it. The two-phase embedder release helps but
+cannot create 1.6 GB.
+
+**Why the benchmark misled.** It scored 30 *identical* pairs, so every batch
+padded to the same length and the model stayed resident between batches. Real
+candidates vary in length and the working set is larger. The same benchmark
+under-predicted mini by 25% (3.6 min predicted, 4.5 min actual); for bge the
+error compounded with swapping into 7×. The lesson is narrow and worth writing
+down: **a uniform-input microbenchmark predicts a varied-input batch job badly,
+and predicts nothing at all once the host starts swapping.**
+
+**The probe paid for itself** — 10 minutes spent to avoid 3.4 hours — and the 7
+completed cases are checkpointed, so a retry after freeing memory resumes
+rather than restarts.
+
+### Consequence for the reported numbers
+
+`nyaya-reranker-mini-v1` is, for now, the **only** reranker the gold set has
+been measured with on this hardware. The Stage 8 figures stand as mini's, and
+recall@6 = 94.4% should be quoted as such. To get bge's numbers, one of:
+
+1. **Cap Docker Desktop memory to 1 GB** (Settings → Resources). It reserves up
+   to 3.8 GB for one Postgres container using 79 MB; capping frees ~2.8 GB,
+   more than bge needs. This is a GUI action and cannot be scripted.
+2. Run the eval with Postgres stopped — impossible, it reads the corpus.
+3. Load bge in float16 (halves it to ~1.05 GB), accepting that CPU fp16 is
+   often slower per op and that scores would shift, so the floor would need
+   recalibrating again.
+4. Run it on a machine with more than 8 GB.
+
+Option 1 is the cheap one and needs thirty seconds of the owner's time.

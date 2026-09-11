@@ -19,11 +19,42 @@ from sqlalchemy.pool import NullPool
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+
+def _default_database_url() -> str:
+    """Where the throwaway test databases should be created.
+
+    Hardcoding a port here was a real bug: this machine's Postgres runs on 5433
+    (5432 is occupied by an unrelated server), so the default pointed at a
+    server with no ``legaledge`` role and **15 database-backed tests skipped
+    silently** — including the ``section_no_sort`` ordering suite, which is one
+    of the four things that are supposed to have a full suite. A green run that
+    quietly tested less than it claimed is the exact failure mode worth
+    preventing.
+
+    So the host and port come from the developer's own ``DATABASE_URL`` in
+    ``.env`` when there is one, with the database name replaced. An explicit
+    ``DATABASE_URL`` in the environment still wins over both, because
+    ``os.environ.setdefault`` below never overwrites it.
+    """
+    fallback = "postgresql://legaledge:legaledge@localhost:5432/legaledge_test"
+    dotenv = REPO_ROOT / ".env"
+    if not dotenv.exists():
+        return fallback
+    for line in dotenv.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("DATABASE_URL="):
+            continue
+        url = line.split("=", 1)[1].strip()
+        server, _, _database = url.rpartition("/")
+        if server:
+            return f"{server}/legaledge_test"
+    return fallback
+
+
 # Deterministic, obviously-fake values. Real deployments read these from .env.
 TEST_ENV = {
     "APP_ENV": "ci",
     "LOG_JSON": "true",
-    "DATABASE_URL": "postgresql://legaledge:legaledge@localhost:5432/legaledge_test",
+    "DATABASE_URL": _default_database_url(),
     "JWT_SECRET": "test-only-secret-value-of-at-least-32-characters",
     "CREDENTIAL_ENC_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     "CORPUS_ARCHIVE_DIR": str(REPO_ROOT / "var" / "corpus_archive"),
