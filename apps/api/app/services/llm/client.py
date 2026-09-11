@@ -37,17 +37,30 @@ class Completion:
     tokens_out: int | None
 
 
-def require_api_key(settings: Settings) -> str:
-    """The configured key, or the typed 402.
+def provider_of(model: str) -> str:
+    """The provider half of a LiteLLM model id (``anthropic/claude-...``)."""
+    return model.split("/", 1)[0]
 
-    Called before retrieval spends anything only when the question is going to
-    reach the model — an abstention needs no key, which is both correct and the
-    reason an out-of-corpus question costs nothing.
+
+def require_api_key(settings: Settings, api_key: str | None = None) -> str:
+    """The key to use for this call, or the typed 402.
+
+    ``api_key`` is the caller's own, resolved from the vault. When it is absent
+    the environment's ``LLM_API_KEY`` is used — the single-key development mode
+    Stages 4-6 ran on — and that fallback is **refused in production**, so a
+    deployment cannot quietly bill every user's questions to the operator.
+
+    Reached only when a question is actually going to the model: an abstention
+    needs no key at all, which is why an out-of-corpus question costs nothing
+    and works for a user who has stored nothing.
     """
-    key = settings.LLM_API_KEY.strip()
-    if not key:
-        raise MissingProviderKeyError(details={"provider": settings.LLM_MODEL.split("/", 1)[0]})
-    return key
+    if api_key and api_key.strip():
+        return api_key.strip()
+    fallback = settings.LLM_API_KEY.strip()
+    if fallback and not settings.is_production:
+        logger.warning("llm_using_shared_env_key", app_env=settings.APP_ENV)
+        return fallback
+    raise MissingProviderKeyError(details={"provider": provider_of(settings.LLM_MODEL)})
 
 
 def _translate(exc: Exception) -> Exception:
@@ -77,6 +90,7 @@ async def complete(
     model: str | None = None,
     max_tokens: int | None = None,
     timeout_seconds: float | None = None,
+    api_key: str | None = None,
 ) -> Completion:
     """One non-streaming completion.
 
@@ -85,12 +99,12 @@ async def complete(
     """
     import litellm
 
-    api_key = require_api_key(settings)
+    key = require_api_key(settings, api_key)
     try:
         response = await litellm.acompletion(
             model=model or settings.LLM_MODEL,
             messages=messages,
-            api_key=api_key,
+            api_key=key,
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=max_tokens or settings.LLM_MAX_OUTPUT_TOKENS,
             timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
@@ -116,7 +130,7 @@ async def complete(
 
 
 async def stream(
-    settings: Settings, messages: list[dict[str, str]]
+    settings: Settings, messages: list[dict[str, str]], *, api_key: str | None = None
 ) -> AsyncIterator[str | Completion]:
     """Yield text deltas as they arrive, then one final :class:`Completion`.
 
@@ -127,7 +141,7 @@ async def stream(
     """
     import litellm
 
-    api_key = require_api_key(settings)
+    key = require_api_key(settings, api_key)
     chunks: list[str] = []
     usage = None
     model = settings.LLM_MODEL
@@ -135,7 +149,7 @@ async def stream(
         response = await litellm.acompletion(
             model=settings.LLM_MODEL,
             messages=messages,
-            api_key=api_key,
+            api_key=key,
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_OUTPUT_TOKENS,
             timeout=settings.LLM_TIMEOUT_SECONDS,
@@ -162,3 +176,43 @@ async def stream(
         tokens_in=getattr(usage, "prompt_tokens", None),
         tokens_out=getattr(usage, "completion_tokens", None),
     )
+
+
+# Smallest completion each provider will accept, used only to ask "does this key
+# work?". One token is cheaper than any provider's model-listing endpoint and,
+# unlike listing, it proves the key can actually be used to generate.
+PROBE_MESSAGES = [{"role": "user", "content": "ping"}]
+PROBE_MODELS = {
+    "anthropic": "anthropic/claude-3-5-haiku-20241022",
+    "openai": "openai/gpt-4o-mini",
+    "google": "gemini/gemini-2.0-flash",
+    "groq": "groq/llama-3.1-8b-instant",
+    "openrouter": "openrouter/openai/gpt-4o-mini",
+}
+
+
+async def probe(settings: Settings, *, provider: str, api_key: str) -> None:
+    """Verify a key against its provider. Raises a typed ProviderError if not.
+
+    Deliberately a one-token generation rather than a model list: a key that
+    can list models cannot necessarily generate with them, and generating is
+    what we are about to do with it.
+    """
+    import litellm
+
+    model = PROBE_MODELS.get(provider)
+    if model is None:
+        raise ProviderError(f"No verification probe is defined for {provider!r}.")
+    try:
+        await litellm.acompletion(
+            model=model,
+            messages=PROBE_MESSAGES,
+            api_key=api_key,
+            max_tokens=1,
+            timeout=min(settings.LLM_TIMEOUT_SECONDS, 20.0),
+        )
+    except Exception as exc:
+        translated = _translate(exc)
+        if isinstance(translated, ProviderError):
+            raise translated from exc
+        raise ProviderError(details={"provider_message": str(exc)[:200]}) from exc

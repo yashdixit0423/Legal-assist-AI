@@ -68,7 +68,11 @@ def _render_turns(turns: list[dict[str, str]]) -> str:
 
 
 async def rewrite_question(
-    settings: Settings, question: str, turns: list[dict[str, str]]
+    settings: Settings,
+    question: str,
+    turns: list[dict[str, str]],
+    *,
+    api_key: str | None = None,
 ) -> Rewrite:
     """Fold prior turns into a standalone question, or return the original."""
     if not turns:
@@ -88,6 +92,7 @@ async def rewrite_question(
             model=settings.rewrite_model,
             max_tokens=settings.REWRITE_MAX_TOKENS,
             timeout_seconds=settings.REWRITE_TIMEOUT_SECONDS,
+            api_key=api_key,
         )
     except LegalEdgeError as exc:
         # Includes a missing key: rewriting must not be the thing that turns an

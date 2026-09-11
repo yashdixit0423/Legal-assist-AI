@@ -109,9 +109,10 @@ async def _prepare(
     *,
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
+    api_key: str | None = None,
 ) -> Prepared:
     """Rewrite, retrieve, rerank, gate, expand and pack. No model call to answer."""
-    rewrite = await rewrite_question(settings, question, turns or [])
+    rewrite = await rewrite_question(settings, question, turns or [], api_key=api_key)
     candidates = await hybrid_search(session, settings, rewrite.question, statute_slug=statute_slug)
     ranked = rerank(settings, rewrite.question, candidates)
     gate = apply_floor(ranked, floor=settings.RERANK_SCORE_FLOOR, top_n=settings.RERANK_TOP_N)
@@ -163,15 +164,18 @@ async def answer_question(
     *,
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
+    api_key: str | None = None,
 ) -> AskResult:
     """Answer one question, or abstain honestly."""
     started = time.perf_counter()
-    prepared = await _prepare(session, settings, question, turns=turns, statute_slug=statute_slug)
+    prepared = await _prepare(
+        session, settings, question, turns=turns, statute_slug=statute_slug, api_key=api_key
+    )
     if not prepared.ready:
         return _abstention(prepared, started=started)
 
     messages = build_messages(prepared.rewrite.question, prepared.context)
-    completion = await llm.complete(settings, messages)
+    completion = await llm.complete(settings, messages, api_key=api_key)
     check = validate_citations(completion.text, prepared.allowed)
 
     violation = check.violation
@@ -244,6 +248,7 @@ async def stream_answer(
     *,
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
+    api_key: str | None = None,
 ) -> AsyncIterator[tuple[Event, AskResult | None]]:
     """Yield SSE events, and on the final ``done`` the result for logging.
 
@@ -282,7 +287,7 @@ async def stream_answer(
 
     messages = build_messages(prepared.rewrite.question, prepared.context)
     try:
-        streamed = await _stream_attempt(settings, messages, prepared)
+        streamed = await _stream_attempt(settings, messages, prepared, api_key=api_key)
     except LegalEdgeError as exc:
         yield Event("error", {"code": exc.code, "message": exc.message}), None
         return
@@ -306,7 +311,9 @@ async def stream_answer(
         )
         try:
             completion = await llm.complete(
-                settings, _retry_messages(prepared, streamed.text, streamed.check_or_empty)
+                settings,
+                _retry_messages(prepared, streamed.text, streamed.check_or_empty),
+                api_key=api_key,
             )
         except LegalEdgeError as exc:
             yield Event("error", {"code": exc.code, "message": exc.message}), None
@@ -360,7 +367,11 @@ class _StreamAttempt:
 
 
 async def _stream_attempt(
-    settings: Settings, messages: list[dict[str, str]], prepared: Prepared
+    settings: Settings,
+    messages: list[dict[str, str]],
+    prepared: Prepared,
+    *,
+    api_key: str | None = None,
 ) -> _StreamAttempt:
     """Consume one streamed completion, stopping the moment a citation is bad."""
     events: list[Event] = []
@@ -368,7 +379,7 @@ async def _stream_attempt(
     completion = None
     violated = False
 
-    async for part in llm.stream(settings, messages):
+    async for part in llm.stream(settings, messages, api_key=api_key):
         if not isinstance(part, str):
             completion = part
             break

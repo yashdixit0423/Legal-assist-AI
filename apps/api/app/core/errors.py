@@ -63,6 +63,12 @@ class NotFoundError(LegalEdgeError):
     message = "The requested resource does not exist."
 
 
+class ConflictError(LegalEdgeError):
+    code = "conflict"
+    http_status = 409
+    message = "That resource already exists."
+
+
 class RateLimitedError(LegalEdgeError):
     code = "rate_limited"
     http_status = 429

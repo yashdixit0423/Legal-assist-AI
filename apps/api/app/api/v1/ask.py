@@ -16,12 +16,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request
 from sse_starlette.sse import EventSourceResponse
 
+from app.api.deps import CurrentUser
 from app.core.config import Settings, get_settings
+from app.core.errors import LegalEdgeError
 from app.core.logging import get_logger
+from app.db.models import User
 from app.db.session import get_sessionmaker
 from app.schemas.ask import AskRequest, AskResponse, SourceBlock
 from app.services.answer import pipeline
 from app.services.answer.pipeline import AskResult
+from app.services.auth import accounts
+from app.services.llm import client as llm
 
 router = APIRouter(tags=["ask"])
 logger = get_logger(__name__)
@@ -76,17 +81,22 @@ def _turns(payload: AskRequest) -> list[dict[str, str]]:
 async def ask(
     payload: AskRequest,
     request: Request,
+    user: CurrentUser,
     settings: Annotated[Settings, Depends(get_settings)],
     accept: Annotated[str, Header()] = "application/json",
 ) -> AskResponse | EventSourceResponse:
     """Answer from retrieved text, or abstain.
 
+    The only endpoint that requires authentication, because it is the only one
+    that spends money — the caller's own, from the vault.
+
     A 200 with ``abstained: true`` is a successful outcome, not a failure: the
     corpus does not cover the question and no model was called.
     """
+    api_key = await _resolve_key(settings, user)
     if "text/event-stream" in accept.lower():
         return EventSourceResponse(
-            _event_stream(payload, request, settings),
+            _event_stream(payload, request, settings, api_key),
             ping=15,
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
@@ -100,6 +110,7 @@ async def ask(
             payload.question,
             turns=_turns(payload),
             statute_slug=payload.statute_slug,
+            api_key=api_key,
         )
     await _log(result)
     return AskResponse(
@@ -122,8 +133,26 @@ async def ask(
     )
 
 
+async def _resolve_key(settings: Settings, user: User) -> str | None:
+    """The caller's own key for the configured model's provider.
+
+    Returns ``None`` rather than raising when nothing is stored, so the
+    abstention path still runs for free: a question the corpus cannot answer
+    must not require a key, and finding that out costs no provider call. The
+    typed 402 is raised later, by ``require_api_key``, and only once we know we
+    would actually have generated something.
+    """
+    provider = llm.provider_of(settings.LLM_MODEL)
+    async with get_sessionmaker()() as session:
+        try:
+            return await accounts.resolve_api_key(session, settings, user, provider)
+        except LegalEdgeError as exc:
+            logger.info("ask_no_stored_key", provider=provider, code=exc.code)
+            return None
+
+
 async def _event_stream(
-    payload: AskRequest, request: Request, settings: Settings
+    payload: AskRequest, request: Request, settings: Settings, api_key: str | None
 ) -> AsyncIterator[dict[str, str]]:
     """Adapt pipeline events onto the SSE wire format.
 
@@ -139,6 +168,7 @@ async def _event_stream(
                 payload.question,
                 turns=_turns(payload),
                 statute_slug=payload.statute_slug,
+                api_key=api_key,
             ):
                 if await request.is_disconnected():
                     logger.info("ask_stream_client_gone")

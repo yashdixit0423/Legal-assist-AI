@@ -1162,3 +1162,169 @@ latency_ms=48287    user-ish columns: []    foreign keys: 0
 - `ask_logs` must stay anonymous when auth arrives. There is a test asserting
   the table has no `user_id` and no foreign keys; it should be left in place
   precisely because Stage 7 is when someone would be tempted to add one.
+
+---
+
+## 2026-09-11 · Stage 7 — Auth and the BYOK credential vault
+
+Branch `stage-7-auth`. Accounts, JWT, and an AES-256-GCM vault for each user's
+own provider key. 155 tests green. **No new dependency**: argon2-cffi,
+cryptography and PyJWT were already pinned from Stage 0.
+
+### Built
+
+- `POST /v1/auth/register` · `/login` · `/refresh`, `GET /v1/auth/me`.
+- `PUT /v1/credentials`, `GET /v1/credentials` (metadata only),
+  `DELETE /v1/credentials/{provider}`, `POST /v1/credentials/verify`.
+- `services/auth/{passwords,tokens,vault,accounts}.py`, `api/deps.py`,
+  `schemas/auth.py`, `api/v1/auth.py`.
+- `/v1/ask` now requires a bearer token and spends **the caller's** key.
+- `tests/unit/test_auth.py` — 21 tests.
+
+### Decisions
+
+**The vault gets a full suite, making five pillars rather than four.** The
+scope cut named four things that can silently produce a wrong answer. A vault
+that silently misbehaves hands one user's provider key — their money — to
+someone else, and nothing about the symptom would point at the cause. The
+tests are cheap and deterministic, so this is a small exception to the cut and
+not a return to over-testing.
+
+**User id and provider are authenticated as GCM associated data.** A row moved
+between accounts, or relabelled to another provider, fails to decrypt rather
+than quietly handing over the wrong key. Two tests assert exactly that.
+
+**A fresh 12-byte nonce per write**, asserted over 20 writes. GCM nonce reuse
+under one key leaks the XOR of the plaintexts and the authentication subkey;
+this is the one crypto mistake here that would be catastrophic and invisible.
+
+**`key_hint` is the last four characters only** — enough to recognise which
+key is stored, useless for reconstructing it. A short key gets no hint at all.
+
+**Write-only is enforced in the type system, not only the prose.** There is no
+field in any response schema that could carry a key, and a test asserts none
+of `api_key`/`key`/`secret`/`ciphertext` appears in the response models. The
+one function that decrypts is unreachable from any route.
+
+**Auth is per-route, not global middleware.** Spec §06 requires that reading
+the corpus needs no credentials, and a global guard with an exemption list is
+one careless edit away from either locking the corpus or opening `/v1/ask`.
+Requiring the dependency where it applies makes the protected set readable
+from the route definitions.
+
+**One error for every login failure.** Unknown email, wrong password and
+deactivated account all return the same 401 with the same message, and a
+missing user still runs a dummy Argon2 verification so the response time does
+not differ. Otherwise the login form is an account-enumeration oracle.
+
+**The `.env` shared key survives as a development fallback, refused in
+production.** `require_api_key` prefers the caller's stored key, falls back to
+`LLM_API_KEY` only when `APP_ENV != production`, and logs a warning when it
+does. Without that guard a deployment would quietly bill every user's
+questions to the operator.
+
+**`EmailStr` was not used.** It requires the `email-validator` package, which
+is not in the pinned set, and adding a dependency needs asking. The validator
+here enforces the same rule the database already does
+(`ck_users_email_shape`), so the API and the CHECK constraint cannot disagree
+about what an email is.
+
+**Verification is a one-token generation, not a model list.** Spec §06 says
+verify should "live-check a key and list available models". The check is real;
+**model listing is not implemented** — see gaps. A key that can list models
+cannot necessarily generate with them, and generating is what we are about to
+do with it.
+
+### Bugs found and fixed inside this stage
+
+1. **`DELETE /v1/credentials/{provider}` broke application startup.** A 204
+   route annotated `-> None` still has FastAPI build a JSON response, and
+   Starlette asserts "Status code 204 must not have a response body" — at app
+   construction, so *every* test using the app errored, not just that route.
+   Fixed with an explicit `response_class=Response`. Six unrelated test
+   failures disappeared with it, which is a reminder that a cascade of
+   failures usually has one cause.
+2. **`provider_of` was never written.** An earlier edit's target string had
+   already been reformatted by `ruff`, so a `str.replace` silently did
+   nothing and `require_api_key(settings, api_key)` was calling a
+   one-argument function. The unit tests passed — nothing reaches that call
+   without a key — and only the live end-to-end run caught it. Every
+   subsequent patch in this stage asserts its pattern matched before writing.
+
+### Evidence — live
+
+```
+auth boundary
+  POST /v1/ask          -> 401 unauthenticated
+  GET  /v1/credentials  -> 401 unauthenticated
+  GET  /v1/statutes     -> 200      GET /v1/sections/390 -> 200
+  POST /v1/search       -> 200      GET /v1/health       -> 200
+
+accounts
+  register                 -> 201
+  register again           -> 409 conflict
+  login (UPPER-CASE email) -> 200          (normalised, per the CHECK)
+  login wrong password     -> 401 unauthenticated
+  login unknown email      -> 401 unauthenticated   <- identical, no enumeration
+
+token discipline
+  refresh token as bearer  -> 401      access token at /refresh -> 401
+  POST /v1/auth/refresh    -> 200, new pair issued
+
+the vault
+  PUT  /v1/credentials -> 200 {"provider":"anthropic","key_hint":"1234","key_version":1,...}
+  GET  /v1/credentials -> 200 [ ...same metadata... ]
+  key present anywhere in a response body?  False
+  PUT unknown provider -> 422 invalid_request
+  DELETE               -> 204, list now empty
+
+verify, against the real Anthropic API with a deliberately fake key
+  POST /v1/credentials/verify -> 200
+       {"valid": false, "error_code": "provider_key_invalid", ...}
+
+ask, authenticated, out-of-corpus question
+  200 abstained=true   -- no provider call, so no key was needed at all
+```
+
+That last line is the property worth keeping: an authenticated user with **no**
+stored key still gets a correct abstention for free.
+
+### Known gaps at the end of Stage 7
+
+- **No token revocation.** Logging out is a client-side discard and a stolen
+  refresh token is valid for its full 14 days. Revocation needs a store — a
+  `refresh_tokens` table or Redis — which is a schema decision, not something
+  to slip in unannounced. Flagged for Stage 9.
+- **Model listing on `/v1/credentials/verify` is not implemented.** The
+  response has no `models` field. Doing it properly means a per-provider
+  listing call, five providers, five shapes.
+- **Only the provider matching `LLM_MODEL` is ever used.** A user who stores
+  an OpenAI key while `LLM_MODEL` is `anthropic/...` gets a 402 naming
+  anthropic. Per-user model selection is not in this phase's spec, but the
+  mismatch will confuse someone.
+- **No rate limiting**, on an endpoint that now spends *users'* money as well
+  as the operator's (Stage 9, hand-rolled on Redis per the plan).
+- **`CREDENTIAL_ENC_KEY` rotation is modelled but not implemented.**
+  `key_version` is stored and written as 1; nothing re-encrypts on rotation,
+  and a changed key makes stored credentials undecryptable with a clear error.
+- **Registration is open.** No email verification, no invite, no admin. Fine
+  for a private deployment, not for a public URL.
+- Still carried, unfixed, at the owner's instruction: `.env` port 5432 vs
+  container 5433; **`LLM_API_KEY` empty so a real generated answer, a real
+  streamed token and the live citation-validation path remain unverified**;
+  `/v1/ask` at 38-55 s against a 400 ms target; `ask_logs` records no row for
+  402/provider errors; the Part/Chapter tree blocked on absent source data;
+  LiteLLM's pricing fetch on the request path.
+
+### What Stage 8 needs
+
+- `ask_logs` is the only evaluation data and is being written for answers and
+  abstentions. Note the gap above before computing an abstention rate from it.
+- The gold set should include the four "non-compete" phrasings from Stage 4:
+  two that answer and two that abstain, on the same point of law, are the
+  sharpest available test of retrieval quality.
+- `section_explanations` is still empty and the table is prompt-versioned
+  (`unique (section_id, lang, prompt_version)`), so the explanations job can
+  regenerate without a migration.
+- Verification now exists (`llm.probe`), so the gold-set runner can fail fast
+  with a clear message when the key configured for it does not work.
