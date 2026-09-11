@@ -53,9 +53,7 @@ class ParseResult:
 
 
 def _start_run(session: Session, *, slug: str, command: str) -> IngestRun:
-    run = IngestRun(
-        source_portal=PORTAL, statute_slug=slug, command=command, status="running"
-    )
+    run = IngestRun(source_portal=PORTAL, statute_slug=slug, command=command, status="running")
     session.add(run)
     session.flush()
     return run
@@ -94,9 +92,7 @@ def fetch_act(
             payload = indiacode_api.fetch_act_payload(
                 client, act_id=entry.act_id, handle=entry.handle
             )
-            robots_warnings = [
-                {"kind": "robots", "detail": w} for w in client.stats.warnings
-            ]
+            robots_warnings = [{"kind": "robots", "detail": w} for w in client.stats.warnings]
         archived = archive_json(
             settings,
             slug=entry.slug,
@@ -116,9 +112,7 @@ def fetch_act(
         raise
 
     if session and run:
-        _finish_run(
-            session, run, status="succeeded", docs=1, warnings=robots_warnings
-        )
+        _finish_run(session, run, status="succeeded", docs=1, warnings=robots_warnings)
         session.commit()
 
     return FetchResult(
@@ -176,20 +170,15 @@ def parse_act(
         payload = read_archive(settings, slug=entry.slug, name=ARCHIVE_NAME)
         act, raw_sections = indiacode_api.parse_payload(payload)
         parsed = [
-            parser.parse_section(raw, order_idx=index)
-            for index, raw in enumerate(raw_sections)
+            parser.parse_section(raw, order_idx=index) for index, raw in enumerate(raw_sections)
         ]
-        report = verify_sections(
-            entry.slug, parsed, expected=entry.expected_sections
-        )
+        report = verify_sections(entry.slug, parsed, expected=entry.expected_sections)
         if strict:
             report.raise_if_failed()
 
         from app.services.kb.fetch import sha256_bytes
 
-        sha = sha256_bytes(
-            (settings.CORPUS_ARCHIVE_DIR / entry.slug / ARCHIVE_NAME).read_bytes()
-        )
+        sha = sha256_bytes((settings.CORPUS_ARCHIVE_DIR / entry.slug / ARCHIVE_NAME).read_bytes())
         statute = _upsert_statute(session, entry, act, sha256=sha)
 
         as_of = statute.as_of_date
@@ -202,8 +191,7 @@ def parse_act(
                 "text_verbatim": section.text_verbatim,
                 "text_raw": section.text_raw,
                 "footnotes": [
-                    {"marker": note.marker, "text": note.text}
-                    for note in section.footnotes
+                    {"marker": note.marker, "text": note.text} for note in section.footnotes
                 ],
                 "amendment_note": section.amendment_note,
                 "commenced_on": act.commenced_on,

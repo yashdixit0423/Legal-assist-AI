@@ -75,9 +75,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 def create_sync_engine(settings: Settings) -> Engine:
     """Build a psycopg engine for the pipeline."""
-    return _create_sync_engine(
-        settings.database_url_sync, echo=settings.DB_ECHO, future=True
-    )
+    return _create_sync_engine(settings.database_url_sync, echo=settings.DB_ECHO, future=True)
 
 
 def sync_session(settings: Settings) -> Session:

@@ -84,6 +84,20 @@ class Settings(BaseSettings):
     RERANK_TOP_N: int = Field(default=6, ge=1, le=50)
     RERANK_SCORE_FLOOR: float = Field(default=0.30, ge=0.0, le=1.0)
     MAX_CHUNK_TOKENS: int = Field(default=450, ge=64, le=EMBED_MODEL_MAX_TOKENS)
+    # Reciprocal Rank Fusion constant. 60 is the value from the original paper
+    # and the one spec §05 names; it damps the influence of a single retriever
+    # putting something at rank 1 by mistake.
+    RRF_K: int = Field(default=60, ge=1, le=1000)
+    CONTEXT_BUDGET_TOKENS: int = Field(default=12_000, ge=1000, le=200_000)
+
+    # -- generation --------------------------------------------------------
+    # One key, read from the environment. The BYOK vault is Stage 7; until then
+    # an unset key produces a typed 402, never a 500.
+    LLM_MODEL: str = "anthropic/claude-sonnet-4-5"
+    LLM_API_KEY: str = ""
+    LLM_TEMPERATURE: float = Field(default=0.0, ge=0.0, le=2.0)
+    LLM_MAX_OUTPUT_TOKENS: int = Field(default=1200, ge=64, le=16_000)
+    LLM_TIMEOUT_SECONDS: float = Field(default=60.0, ge=1.0, le=600.0)
 
     # -- model weights -----------------------------------------------------
     # A fixed host directory so the two model repositories download exactly

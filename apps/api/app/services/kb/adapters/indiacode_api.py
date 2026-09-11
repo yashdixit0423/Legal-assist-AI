@@ -137,9 +137,7 @@ def fetch_act_payload(client: PoliteClient, *, act_id: str, handle: str) -> dict
         search = result.get("_embedded", {}).get("searchResult", {})
         objects = search.get("_embedded", {}).get("objects", [])
         items.extend(
-            entry["_embedded"]["indexableObject"]
-            for entry in objects
-            if "_embedded" in entry
+            entry["_embedded"]["indexableObject"] for entry in objects if "_embedded" in entry
         )
         info = search.get("page", {})
         if page + 1 >= int(info.get("totalPages", 1)):

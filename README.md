@@ -14,7 +14,7 @@ relied on — and an honest refusal when the corpus does not cover the question.
 
 ## What works so far
 
-Stages 0 and 1 of ten are complete. See [docs/BUILD-LOG.md](docs/BUILD-LOG.md)
+Stages 0 to 4 of ten are complete. See [docs/BUILD-LOG.md](docs/BUILD-LOG.md)
 for the running record and what each stage delivered.
 
 | Capability | State |
@@ -25,8 +25,12 @@ for the running record and what each stage delivered.
 | `legaledge-kb version` / `check-config` | working |
 | Citation-correct section ordering (`section_no_sort`) | working |
 | Database schema and migrations (10 tables, pgvector, HNSW + GIN) | working |
-| Corpus fetch / parse / index | Stages 2–4 |
-| Corpus read API, auth, retrieval, `POST /v1/ask` | Stages 5–8 |
+| Corpus fetch and parse — six Acts from the India Code API | working |
+| Cross-links, chunking, embeddings, HNSW (`legaledge-kb index`) | working |
+| `POST /v1/ask` — hybrid + RRF + rerank + abstention + citation validation | working |
+| Corpus read API and `POST /v1/search` | Stage 5 |
+| SSE streaming, query rewriting, `ask_logs` | Stage 6 |
+| Auth and the BYOK credential vault | Stage 7 |
 
 ## Bring the stack up
 
@@ -117,9 +121,38 @@ legaledge-kb version
 legaledge-kb check-config     # validates the environment; secrets are never printed
 ```
 
-Pipeline verbs (`fetch`, `parse`, `chunk`, `embed`, `explain`, `verify`, `stats`)
-are registered by the stage that implements them, so `--help` never advertises a
-command that does nothing.
+```bash
+# The corpus pipeline, in order. Each step is idempotent and resumable.
+legaledge-kb fetch            # archive the six Acts from India Code, with checksums
+legaledge-kb parse            # verify continuity, then write statute_sections
+legaledge-kb index            # cross-links, chunks, embeddings, HNSW -- then stats
+```
+
+Remaining pipeline verbs (`explain`, `verify`) are registered by the stage that
+implements them, so `--help` never advertises a command that does nothing.
+
+## Ask a question
+
+`POST /v1/ask` is the only endpoint that needs a model key. Set `LLM_API_KEY` in
+`.env` (`LLM_MODEL` defaults to `anthropic/claude-sonnet-4-5`); without it the
+endpoint returns a typed `402 missing_provider_key` rather than a generic
+failure.
+
+```bash
+curl -s localhost:8000/v1/ask -H 'content-type: application/json' \
+  -d '{"question":"When must a lease of immoveable property be registered?"}' | jq
+```
+
+Two things are worth understanding about the response:
+
+- **`abstained: true` with HTTP 200 is a success.** It means nothing cleared the
+  reranker score floor, so no model was called and nothing was invented. An
+  out-of-corpus question costs nothing and needs no API key.
+- **Every assertion carries a `[S<section_id>]` citation**, and the ids are
+  checked in code against exactly the sections that were packed into the prompt.
+  An answer citing anything else is regenerated once and then abstained on. That
+  check — not the prompt instruction asking for it — is what makes the grounding
+  claim testable.
 
 ## Run the tests
 

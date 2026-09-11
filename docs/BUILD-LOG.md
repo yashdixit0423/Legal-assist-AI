@@ -737,3 +737,159 @@ exists to fix, and it is the query to re-run as the acceptance test for it.
 - The abstention gate and the citation validator are the product claim. The
   "non-compete" query above is the acceptance test for whether hybrid retrieval
   actually earns its place.
+
+---
+
+## 2026-09-11 · Stage 4 — Minimal `POST /v1/ask`
+
+Branch `stage-4-ask`. The milestone: a question goes in, and either a grounded
+answer with validated citations comes out, or an honest abstention does —
+with no model call made on the abstention path.
+
+### Built
+
+- `services/retrieval/hybrid.py` — dense (pgvector cosine) + sparse (`ts_rank`)
+  + Reciprocal Rank Fusion at `k=60`. RRF fuses on *rank*, not score: a cosine
+  of 0.66 and a `ts_rank` of 0.10 are not comparable numbers and normalising
+  them into one scale is a hyperparameter nobody can calibrate.
+- `services/retrieval/rerank.py` — `BAAI/bge-reranker-v2-m3` cross-encoder at
+  its pinned revision, sigmoid applied so the score is a 0-1 number comparable
+  against `RERANK_SCORE_FLOOR`.
+- `services/answer/abstain.py` — the gate. ~25 lines, runs before any model call.
+- `services/answer/pack.py` — expand each surviving chunk to its whole parent
+  section plus one hop of `statute_links`, order by statute then
+  `section_no_sort`, fit to the context budget.
+- `services/answer/citations.py` — the validator.
+- `services/answer/prompt.py` — versioned system prompt (`ask-v1`).
+- `services/llm/client.py` — LiteLLM, with every provider failure mapped onto
+  the typed hierarchy.
+- `services/answer/pipeline.py` — orchestration.
+- `api/v1/ask.py` + `schemas/ask.py` — the route.
+- `tests/unit/test_citations.py` (10) and `tests/unit/test_abstention.py` (10),
+  plus three smoke tests. 117 tests green.
+
+### Decisions
+
+**Citation ids are `[S<section_id>]`, not bare integers.** India Code renders
+footnotes as bare `[1]`, `[2][State Government]`, and those markers are *inside*
+the blocks handed to the model. A bare-integer scheme would make the validator
+argue with the statute's own footnotes forever. A test pins this.
+
+**An answer with no citations fails validation.** Not only fabricated ids: an
+assertion about the law with no provision behind it is exactly the output this
+product exists not to produce. It triggers the same single retry.
+
+**`citation_violation` means fabrication specifically**, not "a retry happened".
+A `no_citations` first attempt that retries successfully reports `false`.
+
+**The provider key is required *after* the gate, never before.** An
+out-of-corpus question therefore needs no key at all and costs nothing — which
+is both the spec's intent and a nice property to be able to demonstrate.
+
+**`LLM_MODEL` defaults to `anthropic/claude-sonnet-4-5`** (owner's choice this
+session). `LLM_API_KEY` ships empty in both `.env` and `.env.example`; the
+owner supplies it directly so it never passes through a transcript.
+
+**The highest-priority block is always packed, even if it alone exceeds the
+budget.** Found while writing the packing test: Indian Stamp Act s.47 is 29k
+characters, roughly 7k tokens. Dropping the very section the reranker chose
+would abstain on a question we had in fact retrieved the answer to. Overflowing
+a 12k budget into a 200k context window is the lesser problem.
+
+### Bugs found and fixed inside this stage
+
+1. **The sparse retriever was returning zero rows — hybrid search was running
+   on one leg.** `websearch_to_tsquery` (and `plainto_tsquery`) join unquoted
+   terms with **AND**, and no statute contains every word of "is a non-compete
+   after employment enforceable" at once. Measured: 0 chunks matched with AND,
+   **117 with OR**. Fixed by lexemising the question with `to_tsvector` (so the
+   stemmer and stopword list are Postgres's) and ORing the lexemes, with
+   `nullif` guarding an all-stopwords question against a tsquery syntax error.
+   After the fix, "when must a rent agreement be registered" surfaces TPA s.107
+   *Leases how made* at sparse rank 1 — a provision dense retrieval had at rank
+   8. This was invisible from the code and only showed up as `sparse=0` in a
+   live run.
+2. **The first Docker build failed while reporting success.** The build ran in
+   a compound shell command whose exit code came from the trailing `tail`, so a
+   `DeadlineExceeded` pulling the BuildKit frontend — network contention with
+   the 3.3 GB reranker download — was reported as exit 0. Rebuilt serially.
+   Worth remembering: check the build's own exit status, not the wrapper's.
+
+### Retrieval evidence — `POST /v1/ask`, live
+
+| Question | Result |
+|---|---|
+| "When must a lease of immoveable property be registered?" | gate **passed** — TPA s.107 *Leases how made* 0.991, Registration s.17 0.983/0.978, s.18 0.945, s.49 0.774; 12 of 43 candidates above the floor → **402 `missing_provider_key`** (no key configured) |
+| "What notice terminates a lease for agricultural purposes?" | gate **passed** — TPA s.117 *Exemption of leases for agricultural purposes* 0.941, s.106 0.928, s.37 0.854; 3 of 53 above floor → **402** |
+| "What is the capital gains tax rate on a flat in Mumbai?" | **200 abstained**, top score 0.0037, 0 of 49 above floor, no model call |
+| "What did the Supreme Court hold in Kesavananda Bharati?" | **200 abstained**, top score 0.0010, 0 of 48 above floor, no model call |
+| "Is an agreement not to compete after leaving employment enforceable?" | **200 abstained**, top score 0.0248, 0 of 52 above floor — see below |
+
+The floor of 0.30 separates cleanly on this evidence: genuine matches land at
+0.77-0.99 and out-of-corpus questions top out at 0.004. It was not tuned to
+produce that; it is the value that was already in `.env`.
+
+### The finding that matters: a vocabulary gap, not a pipeline defect
+
+Contract Act s.27 *Agreement in restraint of trade, void* is the correct answer
+to a non-compete question, and the pipeline abstains on it. Isolated by
+re-asking the same legal question in four ways:
+
+| Phrasing | s.27 rerank score | rank | outcome |
+|---|---:|---:|---|
+| "Can a contract restrain someone from carrying on a lawful profession?" | **0.987** | 1 | answers |
+| "Is an agreement in restraint of trade enforceable?" | **0.817** | 2 | answers |
+| "Is an agreement not to compete after leaving employment enforceable?" | 0.014 | 4 | abstains |
+| "non-compete clause after employment" | ~0.000 | 25 | abstains |
+
+So retrieval, fusion, packing and the gate are all correct — s.27 is *in* the
+candidate set every time. `bge-reranker-v2-m3` simply does not connect the
+commercial term "non-compete" to the statutory term "restraint of trade". Three
+honest options, none taken unilaterally:
+
+1. **Stage 6's query rewriting** is the natural fix and is already planned — it
+   rewrites the question before retrieval, and a rewrite into statutory
+   vocabulary is exactly what closes this.
+2. **Measure `nyaya-reranker-mini-v1` on precisely this case.** ADR 0001 ruled
+   it out on aggregate recall@1, which was right on the evidence available —
+   but it is fine-tuned on Indian Acts and this is an Indian-legal-vocabulary
+   failure. The reranker is already swappable by config.
+3. Lowering the floor does **not** work and should not be tried: s.27 scores
+   0.014 on the failing phrasing while the out-of-corpus top score is 0.0037.
+   No floor separates those two by enough to be safe.
+
+### Non-functional: reranking is ~100× over the latency target
+
+Measured on this laptop's CPU: retrieval 0.8-4.2 s, **reranking 33-50 s** for
+43-59 candidates, end-to-end `/v1/ask` 46-55 s. Spec §06 wants p95 under 400 ms
+for the whole hybrid-plus-rerank path. This is not a tuning problem — it is a
+24-layer cross-encoder scoring ~50 pairs of up to 512 tokens on CPU. Options for
+Stage 9: a GPU, ONNX Runtime with int8 quantisation, cutting `RETRIEVAL_TOP_K`,
+or the mini reranker. Recorded now with numbers so the decision is made against
+data rather than rediscovered during deployment.
+
+### Known gaps at the end of Stage 4
+
+- **Generation and live citation validation are unverified end to end.**
+  `LLM_API_KEY` is empty, so no real completion has been produced. The validator
+  has ten unit tests and the abstention gate ten more, but nothing has yet
+  checked that this prompt, with these blocks, makes a real model emit
+  `[S<id>]` in the expected form. That is the first thing to do once a key is in
+  `.env`, and if the model prefers some other citation shape the prompt — not
+  the validator — is what changes.
+- **No `ask_logs` row is written** (Stage 6, with SSE and query rewriting).
+  `turns` is accepted and ignored; the response says so via `turns_used: false`.
+- **LiteLLM fetches its pricing table from GitHub on first use.** An outbound
+  call on the request path that nothing in this design needs. Pin or disable it
+  in Stage 9.
+- **No rate limiting** on an endpoint that spends the operator's money (Stage 9).
+- The `.env` port mismatch flagged in Stage 3 is still present and unfixed.
+
+### What Stage 5 needs
+
+- `POST /v1/search` is `hybrid_search` minus the reranker, minus the LLM — the
+  retrieval half is already a reusable function taking a session and settings.
+- `GET /v1/statutes/{slug}` wants the part/chapter tree, and `statute_parts` is
+  still empty. That gap now has a user-visible consequence for the first time.
+- Every Stage 5 endpoint is keyless by spec §06, which the current code already
+  satisfies: only `/v1/ask` ever touches `require_api_key`.

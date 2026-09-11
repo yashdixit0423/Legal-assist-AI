@@ -199,3 +199,92 @@ def test_embedding_path_end_to_end(settings_env):
         return sum(x * y for x, y in zip(a, b, strict=True))
 
     assert cosine(question, passages[0]) > cosine(question, passages[1])
+
+
+def test_reciprocal_rank_fusion_rewards_agreement():
+    """One smoke test for §05 step 2: RRF fuses on rank, and a chunk both
+    retrievers found outranks one only a single retriever found at rank 1."""
+    from app.services.retrieval.hybrid import reciprocal_rank_fusion
+    from tests.unit.test_abstention import candidate
+
+    both, dense_only, sparse_only = candidate(1), candidate(2), candidate(3)
+    fused = reciprocal_rank_fusion(
+        [(dense_only, 0.9), (both, 0.5)],
+        [(sparse_only, 0.4), (both, 0.2)],
+        k=60,
+    )
+    assert fused[0].chunk_id == both.chunk_id
+    assert fused[0].dense_rank == 2
+    assert fused[0].sparse_rank == 2
+    assert {c.chunk_id for c in fused} == {1, 2, 3}
+
+
+def test_packing_orders_by_citation_and_respects_the_budget():
+    """One smoke test for §05 step 6."""
+    from app.services.answer.pack import ContextBlock, pack, packed_section_ids
+
+    def block(
+        section_id: int,
+        statute: str,
+        sort_key: str,
+        origin: str,
+        score: float | None = None,
+    ) -> ContextBlock:
+        return ContextBlock(
+            section_id=section_id,
+            statute_short_title=statute,
+            statute_slug="slug",
+            section_no=sort_key,
+            section_no_sort=sort_key,
+            marginal_note="Note",
+            text="Provision text. " * 5,
+            origin=origin,
+            rerank_score=score,
+        )
+
+    blocks = [
+        block(3, "Registration Act, 1908", "0009", "cross_reference"),
+        block(1, "Indian Contract Act, 1872", "0023", "retrieved", 0.9),
+        block(2, "Indian Contract Act, 1872", "0010", "retrieved", 0.8),
+    ]
+    packed = pack(blocks, budget_tokens=10_000)
+    assert [b.section_id for b in packed] == [2, 1, 3], "statute, then section order"
+    assert packed_section_ids(packed) == frozenset({1, 2, 3})
+    assert packed[0].citation_id == "S2"
+
+    # Under pressure, a retrieved section must never be evicted for a
+    # cross-referenced one, and the best block survives a budget it alone
+    # exceeds rather than leaving the prompt empty.
+    tight = pack(blocks, budget_tokens=30)
+    assert [b.section_id for b in tight] == [1], "highest rerank score, kept alone"
+
+
+async def test_ask_abstains_without_calling_a_model(monkeypatch, settings_env):
+    """One smoke test for §05 step 4, which is the product claim: when nothing
+    clears the floor the pipeline returns before any provider call."""
+    from app.core.config import get_settings
+    from app.services.answer import pipeline
+    from app.services.answer.abstain import ABSTENTION_MESSAGE
+    from app.services.llm import client as llm_client
+
+    async def explode(*args, **kwargs):
+        raise AssertionError("the model must not be called on an abstention")
+
+    monkeypatch.setattr(llm_client, "complete", explode)
+
+    async def no_candidates(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(pipeline, "hybrid_search", no_candidates)
+
+    def no_ranking(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(pipeline, "rerank", no_ranking)
+
+    result = await pipeline.answer_question(None, get_settings(), "what is the GST rate")
+    assert result.abstained
+    assert not result.answered
+    assert result.answer == ABSTENTION_MESSAGE
+    assert result.abstain_reason == "no_candidates"
+    assert result.blocks == []
