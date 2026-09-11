@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     DB_POOL_MAX_OVERFLOW: int = Field(default=5, ge=0, le=50)
     DB_ECHO: bool = False
 
+    # -- CORS --------------------------------------------------------------
+    # The browser client runs on a different origin in development (Vite on
+    # 8080, the API on 8000), so it needs explicit permission. Comma-separated.
+    # Production must name its real origin: "*" is refused below, because a
+    # wildcard on an API that accepts bearer tokens is an invitation.
+    CORS_ALLOW_ORIGINS: str = "http://localhost:8080,http://localhost:5173"
+
     # -- cache (optional service) -----------------------------------------
     REDIS_URL: str | None = None
 
@@ -76,7 +83,12 @@ class Settings(BaseSettings):
     # -- retrieval models --------------------------------------------------
     EMBED_MODEL: str = "NyayaLabs98/nyaya-embed-v1"
     EMBED_MODEL_REVISION: str = ""
-    RERANK_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    # ADR 0004: mini is the default below ~12 GB of usable memory. bge-reranker-v2-m3
+    # is the better model and stays one env change away, but it is 2.1 GB against
+    # mini's 0.47 GB and swaps on an 8 GB host, which turns a 4-minute evaluation
+    # into a 3-hour one. RERANK_SCORE_FLOOR is calibrated per model, so these two
+    # settings must move together.
+    RERANK_MODEL: str = "NyayaLabs98/nyaya-reranker-mini-v1"
     RERANK_MODEL_REVISION: str = ""
 
     # -- retrieval tuning --------------------------------------------------
@@ -175,6 +187,19 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return value
 
+    @field_validator("CORS_ALLOW_ORIGINS")
+    @classmethod
+    def _validate_cors(cls, value: str) -> str:
+        """Reject a wildcard: this API takes bearer tokens."""
+        if "*" in value:
+            msg = (
+                "CORS_ALLOW_ORIGINS must list explicit origins, not '*'. "
+                "A wildcard on an API that accepts Authorization headers lets "
+                "any page on the internet spend a signed-in user's provider key."
+            )
+            raise ValueError(msg)
+        return value
+
     @field_validator("FETCH_USER_AGENT")
     @classmethod
     def _validate_user_agent(cls, value: str) -> str:
@@ -193,6 +218,11 @@ class Settings(BaseSettings):
     def database_url_sync(self) -> str:
         """SQLAlchemy URL for psycopg (Alembic and the CLI)."""
         return str(self.DATABASE_URL).replace("postgresql://", "postgresql+psycopg://", 1)
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """The allow-list, as a list."""
+        return [o.strip() for o in self.CORS_ALLOW_ORIGINS.split(",") if o.strip()]
 
     @property
     def is_production(self) -> bool:

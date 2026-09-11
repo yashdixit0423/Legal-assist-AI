@@ -31,3 +31,7 @@ var/corpus_archive/*
 .idea/
 .vscode/
 eval/gold/.checkpoints/
+
+# frontend build artefacts
+legalai_frontend/node_modules/
+legalai_frontend/dist/

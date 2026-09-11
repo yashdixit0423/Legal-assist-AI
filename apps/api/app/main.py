@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app import __version__
@@ -95,6 +96,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
 
+    # CORS before anything else, so a preflight never reaches the app.
+    #
+    # expose_headers matters more than it looks: a browser hides every response
+    # header from JavaScript except a short safelist, so without naming the
+    # rate-limit headers here the client can read the body of a response but
+    # not how many questions the user has left. That failure is silent — the
+    # request succeeds and the counter simply never appears.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,  # bearer tokens, not cookies
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "If-None-Match"],
+        expose_headers=[
+            "ETag",
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+        ],
+    )
     app.add_middleware(RequestContextMiddleware)
     register_exception_handlers(app)
     app.include_router(api_router)

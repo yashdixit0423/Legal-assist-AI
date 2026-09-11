@@ -1,0 +1,475 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+@layer base {
+  :root {
+    --background: 42 33% 97%;
+    --foreground: 220 30% 14%;
+    --card: 39 40% 98%;
+    --card-foreground: 220 30% 14%;
+    --popover: 39 40% 98%;
+    --popover-foreground: 220 30% 14%;
+    --primary: 173 43% 31%;
+    --primary-foreground: 42 33% 97%;
+    --secondary: 38 25% 93%;
+    --secondary-foreground: 220 30% 14%;
+    --muted: 38 25% 93%;
+    --muted-foreground: 219 14% 50%;
+    --accent: 172 32% 88%;
+    --accent-foreground: 173 43% 24%;
+    --destructive: 220 20% 28%;
+    --destructive-foreground: 42 33% 97%;
+    --border: 35 25% 87%;
+    --input: 35 25% 87%;
+    --ring: 173 43% 31%;
+    --radius: 0.75rem;
+    --sidebar-background: 39 40% 98%;
+    --sidebar-foreground: 220 30% 14%;
+    --sidebar-primary: 173 43% 31%;
+    --sidebar-primary-foreground: 42 33% 97%;
+    --sidebar-accent: 172 32% 88%;
+    --sidebar-accent-foreground: 173 43% 24%;
+    --sidebar-border: 35 25% 87%;
+    --sidebar-ring: 173 43% 31%;
+
+    --canvas: 42 33% 97%;
+    --canvas-2: 39 40% 98%;
+    --ink: 220 30% 14%;
+    --ink-2: 220 20% 30%;
+    --ink-3: 219 14% 50%;
+    --ink-4: 219 12% 65%;
+    --line: 35 25% 87%;
+    --line-strong: 34 20% 75%;
+    --brand: 173 43% 31%;
+    --brand-strong: 174 45% 24%;
+    --brand-soft: 172 32% 88%;
+    --brand-foreground: 42 33% 97%;
+  }
+
+  .dark {
+    --background: 220 22% 10%;
+    --foreground: 39 50% 96%;
+    --card: 220 21% 13%;
+    --card-foreground: 39 50% 96%;
+    --popover: 220 21% 13%;
+    --popover-foreground: 39 50% 96%;
+    --primary: 171 43% 58%;
+    --primary-foreground: 220 24% 11%;
+    --secondary: 220 17% 18%;
+    --secondary-foreground: 39 50% 96%;
+    --muted: 220 17% 18%;
+    --muted-foreground: 38 13% 62%;
+    --accent: 172 29% 20%;
+    --accent-foreground: 171 43% 70%;
+    --destructive: 220 16% 30%;
+    --destructive-foreground: 39 50% 96%;
+    --border: 220 17% 22%;
+    --input: 220 17% 22%;
+    --ring: 171 43% 58%;
+    --sidebar-background: 220 22% 10%;
+    --sidebar-foreground: 39 50% 96%;
+    --sidebar-primary: 171 43% 58%;
+    --sidebar-primary-foreground: 220 24% 11%;
+    --sidebar-accent: 172 29% 20%;
+    --sidebar-accent-foreground: 171 43% 70%;
+    --sidebar-border: 220 17% 22%;
+    --sidebar-ring: 171 43% 58%;
+
+    --canvas: 220 22% 10%;
+    --canvas-2: 220 21% 13%;
+    --ink: 39 50% 96%;
+    --ink-2: 38 20% 82%;
+    --ink-3: 38 13% 62%;
+    --ink-4: 39 10% 46%;
+    --line: 220 17% 22%;
+    --line-strong: 220 16% 30%;
+    --brand: 171 43% 58%;
+    --brand-strong: 171 45% 67%;
+    --brand-soft: 172 29% 20%;
+    --brand-foreground: 220 24% 11%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-weight: 400;
+  }
+
+  .brand-mark {
+    display: inline-flex;
+    height: 34px;
+    width: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: hsl(var(--brand));
+    color: hsl(var(--brand-foreground));
+    box-shadow: 0 5px 14px hsl(var(--brand) / 0.18);
+  }
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 0.55rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: hsl(var(--ink-3));
+    transition: color 160ms ease, background-color 160ms ease;
+  }
+
+  .nav-link:hover,
+  .nav-link-active {
+    background: hsl(var(--canvas));
+    color: hsl(var(--brand));
+  }
+
+  .icon-button {
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid hsl(var(--line));
+    border-radius: 0.65rem;
+    color: hsl(var(--ink-3));
+    transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+  }
+
+  .icon-button:hover,
+  .icon-button-active {
+    border-color: hsl(var(--brand));
+    background: hsl(var(--brand-soft));
+    color: hsl(var(--brand));
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: hsl(var(--ink-3));
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .eyebrow-dot,
+  .status-dot {
+    display: inline-block;
+    height: 0.4rem;
+    width: 0.4rem;
+    border-radius: 999px;
+    background: hsl(var(--brand));
+  }
+
+  .status-dot {
+    box-shadow: 0 0 0 4px hsl(var(--brand) / 0.12);
+  }
+
+  .ask-composer,
+  .landing-question-card,
+  .answer-card,
+  .section-panel,
+  .statute-header,
+  .settings-card {
+    border: 1px solid hsl(var(--line));
+    border-radius: 1rem;
+    background: hsl(var(--canvas-2));
+  }
+
+  .ask-composer {
+    padding: 1.25rem;
+    box-shadow: 0 16px 40px hsl(220 25% 20% / 0.04);
+  }
+
+  .ask-composer-disabled {
+    background: linear-gradient(135deg, hsl(var(--canvas-2)), hsl(var(--brand-soft) / 0.25));
+  }
+
+  .landing-question-card {
+    padding: 1.5rem;
+    box-shadow: 0 18px 55px hsl(220 25% 20% / 0.08);
+  }
+
+  .answer-card {
+    padding: 1.25rem;
+  }
+
+  .section-panel {
+    min-height: 420px;
+    overflow: hidden;
+    box-shadow: 0 16px 42px hsl(220 25% 20% / 0.045);
+  }
+
+  /* A row in a list of Acts or search hits. Same surface, no min-height. */
+  .list-card {
+    display: block;
+    border: 1px solid hsl(var(--line));
+    border-radius: 0.85rem;
+    background: hsl(var(--canvas-2));
+    padding: 1rem 1.15rem;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .list-card:hover {
+    border-color: hsl(var(--brand));
+    box-shadow: 0 10px 28px hsl(220 25% 20% / 0.05);
+  }
+
+  .section-reader {
+    overflow: hidden;
+    border: 1px solid hsl(var(--line));
+    border-radius: 1rem;
+    background: hsl(var(--canvas-2));
+    box-shadow: 0 14px 36px hsl(220 25% 20% / 0.04);
+    /* Padding belongs here, not at the call site: without it the tracked-out
+       uppercase eyebrow sits against the border and `overflow: hidden` clips
+       its first letter. */
+    padding: 1.6rem 1.75rem 1.9rem;
+  }
+
+  .section-reader-compact {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  @media (max-width: 640px) {
+    .section-reader {
+      padding: 1.25rem 1.15rem 1.5rem;
+    }
+  }
+
+  /* The provision itself gets a wider measure than the UI around it: this is
+     the authoritative text and it is meant to be read. */
+  .section-reader p {
+    max-width: 74ch;
+  }
+
+  .statute-quote {
+    max-width: 62rem;
+    color: hsl(var(--ink));
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(1.2rem, 1.5vw, 1.55rem);
+    line-height: 1.65;
+    letter-spacing: -0.01em;
+  }
+
+  .citation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid hsl(var(--brand) / 0.48);
+    border-radius: 0.45rem;
+    background: hsl(var(--brand-soft));
+    padding: 0.22rem 0.5rem;
+    color: hsl(var(--brand-strong));
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    vertical-align: 0.08em;
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+
+  .citation-chip:hover {
+    border-color: hsl(var(--brand));
+    background: hsl(var(--brand) / 0.15);
+    transform: translateY(-1px);
+  }
+
+  .suggestion-card {
+    display: flex;
+    min-height: 74px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid hsl(var(--line));
+    border-radius: 0.85rem;
+    background: hsl(var(--canvas-2));
+    padding: 1rem;
+    color: hsl(var(--ink-2));
+    font-size: 0.8rem;
+    line-height: 1.4;
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  }
+
+  .suggestion-card:not(:disabled):hover {
+    border-color: hsl(var(--brand));
+    background: hsl(var(--canvas));
+    transform: translateY(-1px);
+  }
+
+  .feature-icon,
+  .provider-mark {
+    display: inline-flex;
+    height: 2.15rem;
+    width: 2.15rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.7rem;
+    background: hsl(var(--brand-soft));
+    color: hsl(var(--brand));
+  }
+
+  .provider-mark {
+    height: 1.8rem;
+    width: 1.8rem;
+    border-radius: 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .select-wrap {
+    display: inline-flex;
+    height: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid hsl(var(--line));
+    border-radius: 0.75rem;
+    background: hsl(var(--canvas));
+    padding: 0 0.75rem;
+    color: hsl(var(--ink-3));
+  }
+
+  .select-wrap select {
+    max-width: 180px;
+    appearance: none;
+    background: transparent;
+    color: hsl(var(--ink-2));
+    font-size: 0.75rem;
+    font-weight: 600;
+    outline: 0;
+  }
+
+  .meta-label {
+    color: hsl(var(--ink-3));
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .chapter-nav {
+    align-self: start;
+    border-right: 1px solid hsl(var(--line));
+    padding-right: 1.25rem;
+  }
+
+  .chapter-link {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 43px minmax(0, 1fr);
+    gap: 0.5rem;
+    border-left: 2px solid transparent;
+    padding: 0.45rem 0.5rem;
+    text-align: left;
+    font-size: 0.7rem;
+    color: hsl(var(--ink-3));
+    transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  }
+
+  .chapter-link:hover,
+  .chapter-link-active {
+    border-left-color: hsl(var(--brand));
+    background: hsl(var(--brand-soft) / 0.5);
+    color: hsl(var(--brand));
+  }
+
+  .settings-card {
+    padding: 1.25rem;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .settings-card-active {
+    border-color: hsl(var(--brand) / 0.55);
+    box-shadow: 0 12px 32px hsl(var(--brand) / 0.06);
+  }
+
+  .radio-dot {
+    display: inline-block;
+    height: 1rem;
+    width: 1rem;
+    flex-shrink: 0;
+    border: 1px solid hsl(var(--line-strong));
+    border-radius: 999px;
+  }
+
+  .radio-dot-active {
+    border: 4px solid hsl(var(--brand));
+  }
+
+  .stream-caret {
+    display: inline-block;
+    height: 1.1em;
+    width: 2px;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    animation: blink 800ms steps(1) infinite;
+    background: hsl(var(--brand));
+  }
+
+  .landing-hero {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 80% 18%, hsl(var(--brand-soft) / 0.7), transparent 33%), hsl(var(--canvas));
+  }
+
+  .landing-hero::after {
+    position: absolute;
+    right: 6%;
+    top: 9%;
+    height: 240px;
+    width: 240px;
+    border: 1px solid hsl(var(--brand) / 0.12);
+    border-radius: 999px;
+    content: "";
+    pointer-events: none;
+  }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+@media (max-width: 1023px) {
+  .chapter-nav {
+    border-right: 0;
+    border-bottom: 1px solid hsl(var(--line));
+    padding: 0 0 1rem;
+  }
+}
