@@ -205,6 +205,14 @@ def eval_gold(
     limit: Annotated[
         int | None, typer.Option("--limit", help="Run only the first N cases.")
     ] = None,
+    sample: Annotated[
+        int | None,
+        typer.Option("--sample", help="Stratified subset of N cases, for iteration."),
+    ] = None,
+    floor: Annotated[
+        float | None,
+        typer.Option("--floor", help="Re-judge at this score floor. No recomputation."),
+    ] = None,
     fresh: Annotated[
         bool, typer.Option("--fresh", help="Ignore any checkpoint and start over.")
     ] = False,
@@ -217,6 +225,10 @@ def eval_gold(
     Resumable: each case is checkpointed as it completes, under a filename
     that fingerprints the configuration it was measured with, so an
     interrupted run continues and a changed configuration starts clean.
+
+    ``--floor`` re-judges an existing run at a different score floor without
+    recomputing anything, because the checkpoint stores scores rather than
+    verdicts. ``--sample N`` takes a stratified subset, for iteration.
     """
     import asyncio
     import json as _json
@@ -231,15 +243,17 @@ def eval_gold(
         engine = create_async_engine(settings.database_url_async)
         try:
             async with AsyncSession(engine) as session:
-                return to_dict(
-                    await run_gold(
-                        settings=settings,
-                        session=session,
-                        path=path,
-                        limit=limit,
-                        fresh=fresh,
-                    )
+                report = await run_gold(
+                    settings=settings,
+                    session=session,
+                    path=path,
+                    limit=limit,
+                    sample=sample,
+                    fresh=fresh,
                 )
+                if floor is not None:
+                    report = report.refloor(floor=floor)
+                return to_dict(report)
         finally:
             await engine.dispose()
 

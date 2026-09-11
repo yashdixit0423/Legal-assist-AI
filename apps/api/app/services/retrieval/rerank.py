@@ -70,6 +70,10 @@ def rerank(settings: Settings, question: str, candidates: list[Candidate]) -> li
     """
     if not candidates:
         return []
+    # RRF has already ordered them, so truncating here drops the least
+    # promising candidates rather than an arbitrary subset.
+    if len(candidates) > settings.RERANK_CANDIDATES:
+        candidates = candidates[: settings.RERANK_CANDIDATES]
     from torch.nn import Sigmoid
 
     model = get_reranker(settings)

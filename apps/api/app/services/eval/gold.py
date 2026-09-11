@@ -35,8 +35,8 @@ from app.core.config import Settings
 from app.core.errors import CorpusError
 from app.core.logging import get_logger
 from app.db.models import Statute, StatuteSection
-from app.services.answer.abstain import apply_floor
 from app.services.kb.crossref import normalise_section_no
+from app.services.kb.embedding import release_encoder
 from app.services.retrieval.hybrid import hybrid_search
 from app.services.retrieval.rerank import rerank
 
@@ -64,13 +64,54 @@ class GoldCase:
 
 @dataclass
 class CaseOutcome:
-    """What the pipeline did with one gold case."""
+    """What retrieval did with one gold case.
+
+    ``scored`` is the cross-encoder's full output in rank order, as
+    ``(section_id, score)`` pairs with chunk-level duplicates preserved — that
+    is what the abstention gate actually sees. Keeping it is what makes score
+    floor tuning free: the floor is a post-filter over these numbers, so trying
+    a different one is a re-read of a JSON file rather than an hour of
+    recomputation. It is the reason the floor is *not* part of the checkpoint
+    fingerprint.
+    """
 
     case: GoldCase
-    ranked_section_ids: list[int]
-    top_score: float | None
-    abstained: bool
+    scored: list[tuple[int, float]]
     latency_ms: int
+    floor: float
+    top_n: int
+
+    @property
+    def ranked_section_ids(self) -> list[int]:
+        """Distinct sections, best first."""
+        seen: list[int] = []
+        for section_id, _ in self.scored:
+            if section_id not in seen:
+                seen.append(section_id)
+        return seen
+
+    @property
+    def top_score(self) -> float | None:
+        return self.scored[0][1] if self.scored else None
+
+    @property
+    def abstained(self) -> bool:
+        """Recomputed from the cached scores, never stored.
+
+        Identical to what ``apply_floor`` decides at request time: nothing in
+        the best ``top_n`` chunks clears the floor.
+        """
+        return not any(score >= self.floor for _, score in self.scored[: self.top_n])
+
+    def refloor(self, *, floor: float, top_n: int | None = None) -> CaseOutcome:
+        """The same measurement, judged against a different floor. No compute."""
+        return CaseOutcome(
+            case=self.case,
+            scored=self.scored,
+            latency_ms=self.latency_ms,
+            floor=floor,
+            top_n=top_n if top_n is not None else self.top_n,
+        )
 
     def hit_at(self, k: int) -> bool:
         """True when any labelled section appears in the first ``k`` results."""
@@ -145,6 +186,17 @@ class Report:
     def latency_p95(self) -> int:
         return self._percentile(95)
 
+    def refloor(self, *, floor: float, top_n: int | None = None) -> Report:
+        """This run re-judged at a different floor, in microseconds.
+
+        Tuning the floor is the whole reason Pass A caches scores rather than
+        verdicts. Sweeping ten candidate floors used to mean ten full runs.
+        """
+        return Report(
+            outcomes=[o.refloor(floor=floor, top_n=top_n) for o in self.outcomes],
+            label_errors=list(self.label_errors),
+        )
+
     def _percentile(self, pct: int) -> int:
         values = sorted(o.latency_ms for o in self.outcomes)
         if not values:
@@ -204,32 +256,70 @@ async def _section_index(session: AsyncSession) -> dict[tuple[str, str], int]:
     return {(str(slug), normalise_section_no(str(number))): int(sid) for slug, number, sid in rows}
 
 
-async def run_case(session: AsyncSession, settings: Settings, case: GoldCase) -> CaseOutcome:
-    """Retrieve, rerank and apply the gate — exactly as ``/v1/ask`` does."""
+async def retrieve_candidates(
+    session: AsyncSession, settings: Settings, case: GoldCase
+) -> tuple[list[Any], int]:
+    """Phase 1: hybrid retrieval only. Needs the embedder, not the reranker."""
     started = time.perf_counter()
     candidates = await hybrid_search(session, settings, case.question)
-    ranked = rerank(settings, case.question, candidates)
-    gate = apply_floor(ranked, floor=settings.RERANK_SCORE_FLOOR, top_n=settings.RERANK_TOP_N)
+    return candidates, int((time.perf_counter() - started) * 1000)
 
-    seen: list[int] = []
-    for item in ranked:
-        section_id = item.candidate.section_id
-        if section_id not in seen:
-            seen.append(section_id)
+
+def score_candidates(
+    settings: Settings, case: GoldCase, candidates: list[Any], retrieval_ms: int
+) -> CaseOutcome:
+    """Phase 2: cross-encoder scoring. Needs the reranker, not the embedder."""
+    started = time.perf_counter()
+    ranked = rerank(settings, case.question, candidates)
+    elapsed = retrieval_ms + int((time.perf_counter() - started) * 1000)
     return CaseOutcome(
         case=case,
-        ranked_section_ids=seen,
-        top_score=gate.top_score,
-        abstained=not gate.passed,
-        latency_ms=int((time.perf_counter() - started) * 1000),
+        scored=[(item.candidate.section_id, item.score) for item in ranked],
+        latency_ms=elapsed,
+        floor=settings.RERANK_SCORE_FLOOR,
+        top_n=settings.RERANK_TOP_N,
     )
+
+
+async def run_case(session: AsyncSession, settings: Settings, case: GoldCase) -> CaseOutcome:
+    """Retrieve and score one case — the same path ``/v1/ask`` takes."""
+    candidates, retrieval_ms = await retrieve_candidates(session, settings, case)
+    return score_candidates(settings, case, candidates, retrieval_ms)
+
+
+def stratified_sample(cases: list[GoldCase], size: int) -> list[GoldCase]:
+    """A subset that keeps the shape of the set, for iteration not reporting.
+
+    Proportional across topic groups and across the labelled/adversarial split,
+    so a sample cannot accidentally drop every adversarial question or every
+    question about one Act. Deterministic: the same size always yields the same
+    subset, because a moving sample makes two runs incomparable.
+    """
+    if size >= len(cases):
+        return cases
+    groups: dict[tuple[bool, str], list[GoldCase]] = {}
+    for case in cases:
+        groups.setdefault((case.must_abstain, case.topic), []).append(case)
+
+    picked: list[GoldCase] = []
+    share = size / len(cases)
+    for key in sorted(groups, key=lambda k: (k[0], k[1])):
+        members = sorted(groups[key], key=lambda c: c.id)
+        picked.extend(members[: max(1, round(len(members) * share))])
+    picked.sort(key=lambda c: c.id)
+    return picked[:size]
 
 
 def fingerprint(settings: Settings, gold_path: Path) -> str:
     """Identify the exact configuration a set of results was measured under.
 
     Every input that can move a score goes in: the gold file itself, the torch
-    device, both model revisions, the score floor and the candidate count.
+    device, both model revisions, and the candidate counts.
+
+    ``RERANK_SCORE_FLOOR`` and ``RERANK_TOP_N`` deliberately do **not**, because
+    they do not move a score — they only decide what a score means. They are
+    applied when the report is assembled, so sweeping a floor costs a re-read
+    of the ledger instead of an hour of recomputation.
     Results measured under different values are not comparable — mixing CPU and
     MPS scores in one recall figure means two instruments behind one number,
     and a case sitting near the floor could flip for reasons that have nothing
@@ -243,9 +333,8 @@ def fingerprint(settings: Settings, gold_path: Path) -> str:
             "device": settings.resolve_device(),
             "embed": f"{settings.EMBED_MODEL}@{settings.EMBED_MODEL_REVISION}",
             "rerank": f"{settings.RERANK_MODEL}@{settings.RERANK_MODEL_REVISION}",
-            "floor": settings.RERANK_SCORE_FLOOR,
             "top_k": settings.RETRIEVAL_TOP_K,
-            "top_n": settings.RERANK_TOP_N,
+            "candidates": settings.RERANK_CANDIDATES,
         },
         sort_keys=True,
     )
@@ -279,9 +368,9 @@ def _append_checkpoint(path: Path, outcome: CaseOutcome) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     row = {
         "id": outcome.case.id,
-        "ranked_section_ids": outcome.ranked_section_ids,
-        "top_score": outcome.top_score,
-        "abstained": outcome.abstained,
+        # Scores, not verdicts. A verdict bakes in one floor; scores let any
+        # floor be evaluated later for nothing.
+        "scored": [[sid, round(score, 6)] for sid, score in outcome.scored],
         "latency_ms": outcome.latency_ms,
     }
     with path.open("a", encoding="utf-8") as handle:
@@ -289,13 +378,13 @@ def _append_checkpoint(path: Path, outcome: CaseOutcome) -> None:
         handle.flush()
 
 
-def _outcome_from_row(case: GoldCase, row: dict[str, Any]) -> CaseOutcome:
+def _outcome_from_row(case: GoldCase, row: dict[str, Any], settings: Settings) -> CaseOutcome:
     return CaseOutcome(
         case=case,
-        ranked_section_ids=list(row["ranked_section_ids"]),
-        top_score=row["top_score"],
-        abstained=bool(row["abstained"]),
+        scored=[(int(sid), float(score)) for sid, score in row["scored"]],
         latency_ms=int(row["latency_ms"]),
+        floor=settings.RERANK_SCORE_FLOOR,
+        top_n=settings.RERANK_TOP_N,
     )
 
 
@@ -305,16 +394,22 @@ async def run_gold(
     *,
     path: Path = DEFAULT_GOLD,
     limit: int | None = None,
+    sample: int | None = None,
     fresh: bool = False,
 ) -> Report:
-    """Run the gold set, resuming from a checkpoint of the same configuration.
+    """Run the gold set in two phases, resuming from a checkpoint.
 
-    Each case is written to the checkpoint as it completes, so an interrupted
-    run resumes where it stopped. This matters because a full run takes over an
-    hour on CPU, and losing all of it to a stray Ctrl-C is a bad trade for the
-    forty lines this costs.
+    **All retrieval happens first, then the embedder is released, then
+    everything is scored.** That ordering is the memory fix. The embedder is
+    ~1.1 GB and the cross-encoder ~2.1 GB; holding both on an 8 GB host that is
+    also running Docker is what turned an earlier run into swap death — the
+    process sat in uninterruptible wait with a 4 MB resident set, making no
+    progress at all. Interleaving them per case, which is what the request path
+    does and what this function used to do, keeps both resident throughout.
     """
     cases = await load_gold(session, path)
+    if sample is not None:
+        cases = stratified_sample(cases, sample)
     if limit is not None:
         cases = cases[:limit]
 
@@ -323,18 +418,34 @@ async def run_gold(
         ledger.unlink()
     done = _read_checkpoint(ledger)
     if done:
-        logger.info("gold_resuming", completed=len(done), of=len(cases), checkpoint=str(ledger))
+        logger.info("gold_resuming", completed=len(done), of=len(cases))
 
-    report = Report()
-    for number, case in enumerate(cases, start=1):
-        if case.id in done:
-            report.outcomes.append(_outcome_from_row(case, done[case.id]))
-            continue
-        outcome = await run_case(session, settings, case)
-        _append_checkpoint(ledger, outcome)
-        report.outcomes.append(outcome)
+    outstanding = [c for c in cases if c.id not in done]
+
+    retrieved: dict[str, tuple[list[Any], int]] = {}
+    for number, case in enumerate(outstanding, start=1):
+        retrieved[case.id] = await retrieve_candidates(session, settings, case)
+        if number % 25 == 0:
+            logger.info("gold_retrieved", done=number, of=len(outstanding))
+
+    if outstanding:
+        release_encoder(settings)
+
+    for number, case in enumerate(outstanding, start=1):
+        candidates, retrieval_ms = retrieved.pop(case.id)
+        _append_checkpoint(ledger, score_candidates(settings, case, candidates, retrieval_ms))
         if number % 5 == 0:
-            logger.info("gold_progress", done=number, of=len(cases))
+            logger.info("gold_scored", done=number, of=len(outstanding))
+
+    # Assembled from the ledger, so a resumed run and a fresh one agree exactly.
+    rows = _read_checkpoint(ledger)
+    by_id = {c.id: c for c in cases}
+    report = Report()
+    for case_id, row in rows.items():
+        case = by_id.get(case_id)
+        if case is not None:
+            report.outcomes.append(_outcome_from_row(case, row, settings))
+    report.outcomes.sort(key=lambda o: o.case.id)
     return report
 
 

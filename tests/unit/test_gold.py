@@ -35,12 +35,18 @@ def outcome(
     abstained: bool = False,
     adversarial: bool = False,
 ) -> CaseOutcome:
+    """Build an outcome whose cached scores imply the requested verdict.
+
+    Abstention is derived from the scores now rather than stored, so a helper
+    has to produce scores that mean what it claims.
+    """
+    score = 0.01 if abstained else 0.9
     return CaseOutcome(
         case=case(cid, expected, adversarial=adversarial),
-        ranked_section_ids=ranked,
-        top_score=0.9,
-        abstained=abstained,
+        scored=[(sid, score) for sid in ranked],
         latency_ms=100,
+        floor=0.3,
+        top_n=6,
     )
 
 
@@ -217,18 +223,6 @@ def test_the_fingerprint_changes_when_the_device_changes(settings_env, tmp_path,
     assert fingerprint(get_settings(), gold) != before
 
 
-def test_the_fingerprint_changes_when_the_score_floor_changes(settings_env, tmp_path, monkeypatch):
-    from app.core.config import get_settings, reset_settings_cache
-    from app.services.eval.gold import fingerprint
-
-    gold = tmp_path / "g.json"
-    gold.write_text('{"in_corpus": [], "adversarial": []}', encoding="utf-8")
-    before = fingerprint(get_settings(), gold)
-    monkeypatch.setenv("RERANK_SCORE_FLOOR", "0.45")
-    reset_settings_cache()
-    assert fingerprint(get_settings(), gold) != before
-
-
 def test_the_fingerprint_changes_when_the_gold_set_changes(settings_env, tmp_path):
     from app.core.config import get_settings
     from app.services.eval.gold import fingerprint
@@ -247,15 +241,14 @@ def test_a_truncated_checkpoint_line_is_discarded_not_fatal(tmp_path):
 
     ledger = tmp_path / "c.jsonl"
     ledger.write_text(
-        '{"id": "a", "ranked_section_ids": [1], "top_score": 0.9, '
-        '"abstained": false, "latency_ms": 10}\n'
-        '{"id": "b", "ranked_sec',
+        '{"id": "a", "scored": [[1, 0.9]], "latency_ms": 10}\n' '{"id": "b", "scor',
         encoding="utf-8",
     )
     assert set(_read_checkpoint(ledger)) == {"a"}
 
 
-def test_a_checkpointed_case_round_trips(tmp_path):
+def test_a_checkpointed_case_round_trips(tmp_path, settings_env):
+    from app.core.config import get_settings
     from app.services.eval.gold import (
         _append_checkpoint,
         _outcome_from_row,
@@ -265,7 +258,143 @@ def test_a_checkpointed_case_round_trips(tmp_path):
     ledger = tmp_path / "c.jsonl"
     original = outcome("a", {7}, [7, 8], abstained=False)
     _append_checkpoint(ledger, original)
-    restored = _outcome_from_row(original.case, _read_checkpoint(ledger)["a"])
+    restored = _outcome_from_row(original.case, _read_checkpoint(ledger)["a"], get_settings())
     assert restored.ranked_section_ids == original.ranked_section_ids
     assert restored.abstained == original.abstained
     assert restored.hit_at(1) == original.hit_at(1)
+
+
+# --- the two-pass split: scores cached, floor applied afterwards ------------
+
+
+def test_abstention_is_derived_and_matches_apply_floor():
+    """The gate's rule now lives in two places — ``apply_floor`` at request
+    time and ``CaseOutcome.abstained`` at scoring time. If they ever disagree,
+    the measured abstention rate stops describing the shipped behaviour."""
+    from app.services.answer.abstain import apply_floor
+    from app.services.retrieval.rerank import Scored
+    from tests.unit.test_abstention import candidate
+
+    for scores in ([0.9, 0.5], [0.29, 0.1], [0.3], [], [0.2, 0.95]):
+        ranked = [Scored(candidate=candidate(i), score=sc) for i, sc in enumerate(scores, start=1)]
+        gate = apply_floor(ranked, floor=0.3, top_n=6)
+        cached = CaseOutcome(
+            case=case("x", set()),
+            scored=[(1000 + i, sc) for i, sc in enumerate(scores, start=1)],
+            latency_ms=1,
+            floor=0.3,
+            top_n=6,
+        )
+        assert cached.abstained == (not gate.passed), scores
+
+
+def test_refloor_changes_the_verdict_without_recomputing():
+    """This is the whole point of caching scores instead of verdicts."""
+    o = CaseOutcome(case=case("a", {7}), scored=[(7, 0.42)], latency_ms=1, floor=0.3, top_n=6)
+    assert not o.abstained
+    assert o.refloor(floor=0.5).abstained
+    assert o.refloor(floor=0.5).scored == o.scored, "nothing was rescored"
+
+
+def test_a_report_can_be_swept_across_floors():
+    report = Report(
+        outcomes=[
+            CaseOutcome(case=case("a", {1}), scored=[(1, 0.9)], latency_ms=1, floor=0.3, top_n=6),
+            CaseOutcome(case=case("b", {2}), scored=[(2, 0.4)], latency_ms=1, floor=0.3, top_n=6),
+        ]
+    )
+    assert report.false_abstention_rate == 0.0
+    assert report.refloor(floor=0.5).false_abstention_rate == pytest.approx(0.5)
+
+
+def test_ranked_ids_dedupe_chunks_to_sections_in_rank_order():
+    """Several chunks of one long section must count once, at its best rank."""
+    o = CaseOutcome(
+        case=case("a", {7}),
+        scored=[(9, 0.9), (7, 0.8), (9, 0.7), (7, 0.6), (5, 0.5)],
+        latency_ms=1,
+        floor=0.3,
+        top_n=6,
+    )
+    assert o.ranked_section_ids == [9, 7, 5]
+    assert o.reciprocal_rank == pytest.approx(0.5)
+
+
+def test_the_score_floor_is_not_part_of_the_fingerprint(settings_env, tmp_path, monkeypatch):
+    """Changing the floor must NOT invalidate a checkpoint: it moves no score,
+    so re-running the corpus to try a new floor is pure waste."""
+    from app.core.config import get_settings, reset_settings_cache
+    from app.services.eval.gold import fingerprint
+
+    gold = tmp_path / "g.json"
+    gold.write_text('{"in_corpus": [], "adversarial": []}', encoding="utf-8")
+    before = fingerprint(get_settings(), gold)
+    monkeypatch.setenv("RERANK_SCORE_FLOOR", "0.55")
+    reset_settings_cache()
+    assert fingerprint(get_settings(), gold) == before
+
+
+def test_the_candidate_cap_is_part_of_the_fingerprint(settings_env, tmp_path, monkeypatch):
+    """Scoring 30 candidates instead of 50 changes which scores exist at all."""
+    from app.core.config import get_settings, reset_settings_cache
+    from app.services.eval.gold import fingerprint
+
+    gold = tmp_path / "g.json"
+    gold.write_text('{"in_corpus": [], "adversarial": []}', encoding="utf-8")
+    before = fingerprint(get_settings(), gold)
+    monkeypatch.setenv("RERANK_CANDIDATES", "10")
+    reset_settings_cache()
+    assert fingerprint(get_settings(), gold) != before
+
+
+# --- stratified sampling ----------------------------------------------------
+
+
+def test_a_sample_keeps_both_halves_of_the_set():
+    """A sample that dropped every adversarial question would report a perfect
+    abstention rate over nothing."""
+    from app.services.eval.gold import stratified_sample
+
+    cases = [case(f"c{i:02d}", {i}, adversarial=False) for i in range(30)]
+    cases += [case(f"a{i:02d}", set(), adversarial=True) for i in range(10)]
+    picked = stratified_sample(cases, 12)
+    assert any(not c.must_abstain for c in picked)
+    assert any(c.must_abstain for c in picked)
+    assert len(picked) <= 12
+
+
+def test_a_sample_is_deterministic():
+    """Two runs at the same size have to be comparable."""
+    from app.services.eval.gold import stratified_sample
+
+    cases = [case(f"c{i:02d}", {i}) for i in range(40)]
+    assert [c.id for c in stratified_sample(cases, 10)] == [
+        c.id for c in stratified_sample(cases, 10)
+    ]
+
+
+def test_asking_for_more_than_exists_returns_everything():
+    from app.services.eval.gold import stratified_sample
+
+    cases = [case(f"c{i}", {i}) for i in range(5)]
+    assert len(stratified_sample(cases, 99)) == 5
+
+
+def test_the_candidate_cap_truncates_before_the_cross_encoder(settings_env, monkeypatch):
+    """The cap is what latency is proportional to, so it must actually bite."""
+    from app.core.config import get_settings, reset_settings_cache
+    from app.services.retrieval import rerank as reranker
+    from tests.unit.test_abstention import candidate
+
+    monkeypatch.setenv("RERANK_CANDIDATES", "7")
+    reset_settings_cache()
+    seen: list[int] = []
+
+    class FakeModel:
+        def predict(self, pairs, **_kwargs):
+            seen.append(len(pairs))
+            return [0.5] * len(pairs)
+
+    monkeypatch.setattr(reranker, "get_reranker", lambda _s: FakeModel())
+    reranker.rerank(get_settings(), "q", [candidate(i) for i in range(40)])
+    assert seen == [7]

@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     # and the one spec §05 names; it damps the influence of a single retriever
     # putting something at rank 1 by mistake.
     RRF_K: int = Field(default=60, ge=1, le=1000)
+    # How many fused candidates the cross-encoder actually scores. RETRIEVAL_TOP_K
+    # is per retriever, so the RRF union is up to 2x that -- measured at 43-59.
+    # The cross-encoder is one forward pass per candidate and is ~95% of the
+    # request, so this number, not TOP_K, is what the latency is proportional to.
+    RERANK_CANDIDATES: int = Field(default=30, ge=1, le=200)
     CONTEXT_BUDGET_TOKENS: int = Field(default=12_000, ge=1000, le=200_000)
 
     # -- generation --------------------------------------------------------

@@ -181,3 +181,32 @@ def embed_query(settings: Settings, question: str) -> list[float]:
         convert_to_numpy=True,
     )[0]
     return [float(value) for value in vector]
+
+
+def release_encoder(settings: Settings) -> bool:
+    """Drop the embedding model and free its memory. Returns True if it was held.
+
+    For batch jobs on a memory-constrained host. The embedder is ~1.1 GB and the
+    cross-encoder ~2.1 GB; on an 8 GB machine also running Docker, holding both
+    at once is the difference between running and swapping. A pipeline that
+    finishes all its retrieval before it starts any reranking can give the first
+    one back, and an offline evaluation is exactly that shape. The request path
+    must never call this -- there the next request needs the model again.
+    """
+    revision = settings.EMBED_MODEL_REVISION.strip()
+    device = settings.MODEL_DEVICE
+    held = False
+    for key in [k for k in _ENCODERS if k[0] == settings.EMBED_MODEL]:
+        del _ENCODERS[key]
+        held = True
+    _TOKENIZERS.pop((settings.EMBED_MODEL, revision), None)
+    if held:
+        import gc
+
+        gc.collect()
+        if device == "mps":
+            import torch
+
+            torch.mps.empty_cache()
+        logger.info("encoder_released", model=settings.EMBED_MODEL)
+    return held
