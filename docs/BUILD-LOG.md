@@ -893,3 +893,146 @@ data rather than rediscovered during deployment.
   still empty. That gap now has a user-visible consequence for the first time.
 - Every Stage 5 endpoint is keyless by spec §06, which the current code already
   satisfies: only `/v1/ask` ever touches `require_api_key`.
+
+---
+
+## 2026-09-11 · Stage 5 — Corpus read API and search
+
+Branch `stage-5-corpus-api`. Five keyless endpoints. Reading the law is free;
+only `/v1/ask` spends anyone's money, which spec §06 requires and the code now
+structurally guarantees — `require_api_key` is reachable from exactly one route.
+
+### Built
+
+- `GET /v1/statutes` — the six Acts with year, jurisdiction, ministry, in-force
+  section count, as-of date, repeal status and provenance URL.
+- `GET /v1/statutes/{slug}` — one Act plus its full section index in citation
+  order, `sections_total` vs `sections_in_force`, and the Part/Chapter tree.
+- `GET /v1/statutes/{slug}/sections/{no}` — one section verbatim.
+- `GET /v1/sections/{id}` — the same by id; what an `[S<id>]` citation chip
+  resolves against.
+- `POST /v1/search` and `GET /v1/search` — hybrid search, one row per section.
+- `services/corpus_read.py`, `schemas/corpus.py`, `api/v1/corpus.py`,
+  `tests/integration/test_corpus_api.py` (6 tests). 123 tests green.
+
+### Decisions
+
+**Search does not rerank, and says so in the payload.** `reranked: false` is a
+field, not an omission. The cross-encoder costs 30-50 seconds on this CPU
+(measured in Stage 4); a search box that takes a minute is not a search box.
+Search returns RRF fusion order, which the evidence below shows is good enough
+for a ranked list. `/v1/ask` still reranks, because there the cost buys the
+abstention decision.
+
+**Search collapses chunks to sections.** Registration Act s.17 is four chunks;
+four rows for one provision is a worse result list, not a richer one. The
+best-scoring chunk wins and supplies the snippet.
+
+**Omitted sections are excluded from search but included in an Act's index.**
+A reader browsing the IT Act needs to see that s.66A exists and is omitted, or
+the numbering looks broken. A reader searching does not want repealed law in
+their results. Same data, two correct answers, one flag (`include_omitted`).
+
+**Snippets are the head of the matched chunk, not `ts_headline`.** Half the
+hits come from the dense retriever and contain none of the query's words, so
+highlighting would make the field mean "fragment around your terms" for lexical
+matches and "arbitrary opening" for semantic ones. One meaning is worth more
+than one clever feature.
+
+**Section lookup is by normalised number.** `21A`, `21-A` and `21 a` all reach
+the same provision, reusing `crossref.normalise_section_no`. Legal citation is
+not consistent about this and a reader typing the form they saw in a judgment
+should not get a 404. Verified live against IT Act `66a` → `66A`.
+
+**`GET /v1/search` exists alongside the POST form** so a result page is a URL —
+linkable, and cacheable in Stage 9.
+
+### ❌ Blocked: the Part/Chapter tree
+
+Spec §06 says `GET /v1/statutes/{slug}` returns "one Act with its part and
+chapter tree" and that it "powers the browser's navigation". It returns
+`parts: []`. This is not deferred work — **the data does not exist in the
+source we hold**, established by three checks rather than assumed:
+
+1. Every metadata key across all 919 archived India Code items: there is
+   `dc.identifier.no_of_chapter` on the *Act* item (a count, 19 occurrences)
+   and nothing per section. No chapter, no part, no parent.
+2. `dc.identifier.order_number` gives sequence, not hierarchy.
+3. No section's `text_verbatim` or `marginal_note` contains the string
+   `CHAPTER` at all — 0 of 778 — so the headings are not recoverable from the
+   text either.
+
+So the tree is genuinely *unknown*, not merely unloaded, and the response says
+that in a field: `parts_available: false`. An empty list on its own would be
+read by a client as "this Act has no chapters", which is false for all six.
+Populating it needs a different source — the Act PDF's table of contents, which
+India Code does attach — and that is a parsing job of its own, not a line of
+SQL. Flagged for a decision rather than guessed at.
+
+### Evidence — every endpoint, live
+
+```
+GET /v1/statutes                      200   88ms   6 acts
+GET /v1/statutes/dpdp-act-2023        200   13ms   44/44 in force, index of 44
+GET .../indian-contract-act-1872/sections/27    200  s.27 "Agreement in restraint of trade, void."
+GET .../information-technology-act-2000/sections/66a  200  s.66A, is_omitted=true  (normalisation works)
+GET /v1/sections/999999               404   not_found
+GET /v1/statutes/not-an-act           404   not_found
+```
+
+Cross-reference expansion, both directions:
+
+```
+Registration Act s.17   -> 14 related (inbound from s.1, s.18, s.22, s.28, s.34, s.49 ...)
+TPA s.53A               ->  1 related (inbound from Registration Act s.17 -- cross-Act)
+Contract Act s.23       ->  1 related (inbound from TPA s.6 -- cross-Act)
+Registration Act s.89   -> 17 related (both directions)
+```
+
+Search, RRF order, no reranker:
+
+| Query | Top hits | Time |
+|---|---|---|
+| "restraint of trade" | **Contract s.27** (d1/s1), s.26, s.28, s.1, s.29 | 4.9 s cold / — |
+| "when must a rent agreement be registered" | Registration s.48, **TPA s.107 *Leases how made*** (sparse rank 1), Registration s.17, TPA s.116 | 76 ms |
+| "reasonable security safeguards for personal data" | **DPDP s.8 *General obligations of Data Fiduciary*** (d1/s1), **IT Act s.43A *Compensation for failure to protect data*** (d2/s2), DPDP s.17, IT s.66F | 87 ms |
+
+The third query is the one worth noting: it finds the right provision in *two
+different Acts* passed twenty-three years apart, which is the thing a hybrid
+index over a mixed corpus is supposed to do and a keyword search would not.
+
+The 4.9 s on the first query is the embedding model loading on first use, not
+per-query cost; every subsequent search is 76-87 ms. Worth making an explicit
+warm-up in Stage 9 so the first user of a fresh process does not pay it.
+
+### Known gaps at the end of Stage 5
+
+- **The Part/Chapter tree** — see above. Needs a decision.
+- **No caching.** Spec §06 wants statute metadata and section reads served from
+  cache under 300 ms. They are already 13-88 ms uncached on six Acts; the ETag
+  and Redis work stays in Stage 9 where it was scheduled.
+- **Search has no pagination** — `limit` up to 100, no offset. Six Acts and 877
+  chunks do not need it; twenty Acts would.
+- **`explanation` is always null** on a section read. Stage 8 fills it.
+- **Search is not exercised in the test suite**, only against the live corpus
+  (evidence above). Testing it would mean embedding a fixture, which loads the
+  1.1 GB model into a unit-test run — exactly what the "never let a test
+  trigger a download" rule is there to prevent. The read endpoints around it
+  are tested on seeded rows.
+- Still carried and unfixed, at the owner's instruction: the `.env` port
+  mismatch (5432 vs 5433), **`LLM_API_KEY` empty so generation and live
+  citation validation remain unverified**, and **`/v1/ask` at 46-55 s against a
+  400 ms target**.
+
+### What Stage 6 needs
+
+- SSE on `/v1/ask`: `llm.complete` is the only non-streaming call, and LiteLLM's
+  `acompletion(stream=True)` is the change. The citation validator runs on the
+  *assembled* answer, so the abstention-on-second-violation path has to buffer
+  or emit a correction event — worth deciding before writing it.
+- Query rewriting from `turns` goes in front of `hybrid_search` in
+  `pipeline.answer_question`, and is the natural fix for the "non-compete" ↔
+  "restraint of trade" vocabulary gap recorded in Stage 4.
+- `ask_logs` is ready and anonymous by construction; `AskResult` already carries
+  every column it needs (`top_score`, `citation_violation`, `model`, tokens,
+  `latency_ms`).
