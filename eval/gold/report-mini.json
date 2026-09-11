@@ -1,0 +1,113 @@
+{
+  "cases": 139,
+  "in_corpus": 107,
+  "adversarial": 32,
+  "recall": {
+    "@1": 0.8411,
+    "@3": 0.9252,
+    "@6": 0.9439,
+    "@10": 0.972,
+    "@20": 0.9907
+  },
+  "mrr": 0.8901,
+  "abstention_accuracy": 0.9062,
+  "false_abstention_rate": 0.0374,
+  "latency_ms": {
+    "p50": 1706,
+    "p95": 2754
+  },
+  "misses": [
+    {
+      "id": "c12",
+      "topic": "wager",
+      "question": "Are betting and wagering agreements enforceable?",
+      "abstained": true,
+      "top_score": 0.22456,
+      "rank_of_first_correct": 1
+    },
+    {
+      "id": "c17",
+      "topic": "frustration",
+      "question": "What happens to a contract if performance becomes impossible?",
+      "abstained": false,
+      "top_score": 0.878885,
+      "rank_of_first_correct": 7
+    },
+    {
+      "id": "d03",
+      "topic": "consent",
+      "question": "What are the requirements for valid consent under the DPDP Act?",
+      "abstained": true,
+      "top_score": 0.11301,
+      "rank_of_first_correct": 2
+    },
+    {
+      "id": "d08",
+      "topic": "access",
+      "question": "Can I ask a company what personal data it holds about me?",
+      "abstained": false,
+      "top_score": 0.346636,
+      "rank_of_first_correct": 7
+    },
+    {
+      "id": "d10",
+      "topic": "grievance",
+      "question": "How do I complain about how my personal data was handled?",
+      "abstained": false,
+      "top_score": 0.839035,
+      "rank_of_first_correct": 12
+    },
+    {
+      "id": "s02",
+      "topic": "liability",
+      "question": "Who is liable to pay the stamp duty on an instrument?",
+      "abstained": false,
+      "top_score": 0.979657,
+      "rank_of_first_correct": null
+    },
+    {
+      "id": "s05",
+      "topic": "allowance",
+      "question": "Can I get a refund for a spoiled stamp?",
+      "abstained": false,
+      "top_score": 0.814807,
+      "rank_of_first_correct": 9
+    },
+    {
+      "id": "t03",
+      "topic": "restraint on alienation",
+      "question": "Is a condition restraining the buyer from selling the property valid?",
+      "abstained": true,
+      "top_score": 0.234953,
+      "rank_of_first_correct": 1
+    },
+    {
+      "id": "t05",
+      "topic": "part performance",
+      "question": "What protection does a buyer in possession under an unregistered agreement have?",
+      "abstained": true,
+      "top_score": 0.110083,
+      "rank_of_first_correct": 18
+    }
+  ],
+  "wrongly_answered": [
+    {
+      "id": "a08",
+      "topic": "foreign law",
+      "question": "What are the maximum fines under the GDPR?",
+      "top_score": 0.704009
+    },
+    {
+      "id": "a24",
+      "topic": "repealed out",
+      "question": "What are the rights of a partner under Indian partnership law?",
+      "top_score": 0.541023
+    },
+    {
+      "id": "a30",
+      "topic": "other statute",
+      "question": "How do I register a trademark in India?",
+      "top_score": 0.514002
+    }
+  ]
+}

@@ -1583,3 +1583,130 @@ search rate limit, 60/min per address
   live citation validation are still unverified; `ask_logs` records nothing for
   402/provider errors; the Part/Chapter tree is blocked on absent source data;
   model listing on `/v1/credentials/verify` is not implemented.
+
+---
+
+## 2026-09-11 · Stage 8 (completed) — the gold set, measured
+
+The eval was diagnosed, fixed and run. **139 cases in 4 minutes 30 seconds**,
+against the hours it was taking. 185 tests green.
+
+### Why it was slow — three causes, all measured
+
+An external review challenged the assumption that memory alone explained the
+runtime. It was right to: memory was the amplifier, not the whole story.
+
+1. **The cross-encoder was scoring 43-59 candidates, not 30.**
+   `RETRIEVAL_TOP_K` is *per retriever* and RRF unions the two lists. Since the
+   cross-encoder is one forward pass per candidate and ~95% of the request,
+   latency is proportional to that union, not to `TOP_K`. New setting
+   `RERANK_CANDIDATES` (default 30) truncates the RRF-ordered tail.
+2. **Both models were resident for the whole run.** `hybrid_search` holds the
+   1.1 GB embedder, `rerank` holds the 2.1 GB cross-encoder, and interleaving
+   them per question keeps both alive. On an 8 GB host also running Docker that
+   is swap death — the abandoned run ended in uninterruptible wait with a 4 MB
+   resident set and zero progress. `run_gold` now retrieves everything, calls
+   `release_encoder()`, then scores everything.
+3. **Changing the score floor forced a full re-run.** The floor was in the
+   checkpoint fingerprint. But the floor moves no score — it only decides what
+   a score means — so the checkpoint now stores per-candidate **scores** rather
+   than verdicts, abstention is derived from them, and `--floor` re-judges an
+   existing run for nothing. `RERANK_CANDIDATES` took the floor's place in the
+   fingerprint, because it genuinely changes which scores exist.
+
+Three suspects from the review were checked and cleared: the models load once
+(module-level caches, one `reranker_load` line per run), the cross-encoder is
+already batched, and the eval makes **no LLM calls at all** (`grep` returns 0).
+
+### Measured: the two rerankers, 30 candidates, CPU
+
+| Model | ms/pair | 30 candidates | 139 cases | on-topic / off-topic |
+|---|---:|---:|---:|---|
+| `bge-reranker-v2-m3` (24×1024, 568M) | 418 | 12.5 s | ~29 min | 0.6276 / 0.0000 |
+| `nyaya-reranker-mini-v1` (12×384, 118M) | **52** | **1.6 s** | **3.6 min** | 0.5337 / 0.0003 |
+
+**8.0×**, and mini still separates on-topic from off-topic by +0.53. Attention
+compute scales ~14× between them even though parameters scale only ~5×, because
+most of bge's size is a 250k-token embedding table that costs no FLOPs. ADR 0001
+ruled mini out as the *default* on aggregate recall@1, which still stands — it
+is adopted here as the **iteration** model, with bge reserved for the reported
+numbers. The checkpoint fingerprint keeps the two from blending.
+
+### Results — `nyaya-reranker-mini-v1`, all 139 cases
+
+| Metric | Value | Spec §10 bar |
+|---|---:|---|
+| recall@1 | 84.1% | — |
+| recall@3 | 92.5% | — |
+| **recall@6** | **94.4%** | ≥ 85% ✅ |
+| recall@10 | 97.2% | — |
+| recall@20 | 99.1% | — |
+| MRR | 0.8901 | — |
+| **abstention accuracy** | **90.6%** | ≥ 95% ❌ |
+| false abstention | 3.7% | — |
+| latency p50 / p95 | 1706 / 2754 ms | < 400 ms ❌ |
+
+**Retrieval clears its bar comfortably.** recall@6 of 94.4% on 107
+hand-labelled questions, with a 95% interval of about ±4.3 points, so the ≥85%
+criterion is met with room.
+
+**Abstention does not, at the current floor.** And because scores are now
+cached, finding the floor that fixes it cost nothing — this sweep is four
+re-reads of a JSON ledger:
+
+| Floor | Abstention accuracy | False abstention |
+|---|---:|---:|
+| 0.30 (current) | 90.6% | 3.7% |
+| 0.50 | 90.6% | 7.5% |
+| 0.70 | **96.9%** ✅ | 11.2% |
+| 0.80 | 100.0% ✅ | 14.0% |
+
+So the honest reading is that `RERANK_SCORE_FLOOR=0.30` was never calibrated
+against anything — it was a guess inherited from `.env` — and 0.70 is the value
+that meets the spec on this evidence, at the cost of refusing 11.2% of
+answerable questions instead of 3.7%. That is a product judgement about which
+error is worse, and it is the owner's to make, so **the floor has not been
+changed**. Note also that the floor must be recalibrated per reranker: mini and
+bge have different score distributions, and 0.70 is mini's number.
+
+**The three out-of-corpus questions that got through** at floor 0.30 are
+instructive rather than random:
+
+| id | score | question |
+|---|---:|---|
+| a08 | 0.7040 | "What are the maximum fines under the GDPR?" |
+| a24 | 0.5410 | "What are the rights of a partner under Indian partnership law?" |
+| a30 | 0.5140 | "How do I register a trademark in India?" |
+
+The GDPR one survives even a 0.70 floor, and for a defensible reason: the DPDP
+Act is India's GDPR analogue, so its text is genuinely close to the question in
+meaning. Partnership is the case the gold set was built to catch — those
+sections were repealed *out of* the Contract Act, so the corpus holds the
+numbering gap but not the law. Both are arguments for the abstention message
+naming the corpus explicitly, which it does.
+
+### Known gaps
+
+- **`bge-reranker-v2-m3` has not been run over the gold set** (~29 min). The
+  reported numbers above are mini's. The bar-clearing claim for retrieval
+  should be restated on bge before it is quoted externally.
+- **The score floor needs a decision** (see the sweep) and then a
+  recalibration per model.
+- **p95 2754 ms still misses the 400 ms NFR** by ~7×, though that is 20× better
+  than bge's. See the Stage 9 entry: this needs a shape change, not tuning.
+- Carried: `LLM_API_KEY` empty, so generation, streamed tokens and live
+  citation validation remain unverified — now the largest untested area in the
+  build; citation correctness and faithfulness (spec §10) cannot be measured
+  until then. `ask_logs` records nothing for 402/provider errors. No token
+  revocation. Part/Chapter tree blocked on absent source data.
+
+### Resolved, not carried
+
+**The `.env` port mismatch flagged since Stage 3 is fixed.** It stopped being
+cosmetic and started blocking: `docker compose up -d postgres` read
+`POSTGRES_PORT=5432` from `.env`, lost the bind to a foreign Postgres already on
+5432, and every connection then failed with `role "legaledge" does not exist`.
+`.env` now uses 5433 for both `POSTGRES_PORT` and `DATABASE_URL`;
+`.env.example` keeps 5432 for CI. The corpus survived the container recreation
+intact (6 Acts, 778 sections, 877/877 embedded, 503 links) because the data is
+in a named volume, not the container.
