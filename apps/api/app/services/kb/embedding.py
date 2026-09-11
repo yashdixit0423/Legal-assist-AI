@@ -86,13 +86,14 @@ def get_encoder(settings: Settings) -> Any:
     rather than assumed.
     """
     revision = settings.require_embed_revision()
-    key = (settings.EMBED_MODEL, revision)
+    device = settings.resolve_device()
+    key = (settings.EMBED_MODEL, f"{revision}@{device}")
     if key in _ENCODERS:
         return _ENCODERS[key]
 
     from sentence_transformers import SentenceTransformer, models
 
-    logger.info("encoder_load", model=settings.EMBED_MODEL, revision=revision[:12])
+    logger.info("encoder_load", model=settings.EMBED_MODEL, revision=revision[:12], device=device)
     transformer = models.Transformer(
         settings.EMBED_MODEL,
         max_seq_length=EMBED_MODEL_MAX_TOKENS,

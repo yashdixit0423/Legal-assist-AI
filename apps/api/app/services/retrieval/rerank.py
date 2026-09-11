@@ -40,15 +40,21 @@ class Scored:
 def get_reranker(settings: Settings) -> Any:
     """The cross-encoder, on CPU, at the pinned revision."""
     revision = settings.require_rerank_revision()
-    key = (settings.RERANK_MODEL, revision)
+    device = settings.resolve_device()
+    key = (settings.RERANK_MODEL, f"{revision}@{device}")
     if key not in _RERANKERS:
         from sentence_transformers import CrossEncoder
 
-        logger.info("reranker_load", model=settings.RERANK_MODEL, revision=revision[:12])
+        logger.info(
+            "reranker_load",
+            model=settings.RERANK_MODEL,
+            revision=revision[:12],
+            device=device,
+        )
         _RERANKERS[key] = CrossEncoder(
             settings.RERANK_MODEL,
             revision=revision,
-            device="cpu",
+            device=device,
             max_length=512,
         )
     return _RERANKERS[key]

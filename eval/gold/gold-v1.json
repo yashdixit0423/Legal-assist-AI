@@ -1,0 +1,1626 @@
+{
+  "version": "gold-v1",
+  "created": "2026-09-11",
+  "note": "Hand-labelled against the six indexed Acts. Every expected section is verified to exist in the corpus by eval/run_gold.py before any metric is computed -- a label naming a section we do not hold is a failure of the gold set, not of retrieval, and must not be scored as a miss.",
+  "in_corpus": [
+    {
+      "id": "c01",
+      "question": "Is an agreement in restraint of trade enforceable in India?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "27"
+          ]
+        }
+      ],
+      "topic": "non-compete"
+    },
+    {
+      "id": "c02",
+      "question": "Can a contract stop someone from carrying on a lawful profession after leaving a job?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "27"
+          ]
+        }
+      ],
+      "topic": "non-compete"
+    },
+    {
+      "id": "c03",
+      "question": "Is a clause preventing a party from enforcing its rights in court valid?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "28"
+          ]
+        }
+      ],
+      "topic": "restraint of legal proceedings"
+    },
+    {
+      "id": "c04",
+      "question": "When is an agreement without consideration still valid?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "25"
+          ]
+        }
+      ],
+      "topic": "consideration"
+    },
+    {
+      "id": "c05",
+      "question": "Can a minor enter into a contract in India?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "11"
+          ]
+        }
+      ],
+      "topic": "capacity"
+    },
+    {
+      "id": "c06",
+      "question": "What amounts to coercion in contract law?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "15"
+          ]
+        }
+      ],
+      "topic": "free consent"
+    },
+    {
+      "id": "c07",
+      "question": "What is undue influence in a contract?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "16"
+          ]
+        }
+      ],
+      "topic": "free consent"
+    },
+    {
+      "id": "c08",
+      "question": "How is fraud defined for contracts?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "17"
+          ]
+        }
+      ],
+      "topic": "free consent"
+    },
+    {
+      "id": "c09",
+      "question": "What is misrepresentation in a contract?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "18"
+          ]
+        }
+      ],
+      "topic": "free consent"
+    },
+    {
+      "id": "c10",
+      "question": "If consent was obtained by coercion, is the contract void or voidable?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "19"
+          ]
+        }
+      ],
+      "topic": "free consent"
+    },
+    {
+      "id": "c11",
+      "question": "When is the object or consideration of an agreement unlawful?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "23"
+          ]
+        }
+      ],
+      "topic": "legality"
+    },
+    {
+      "id": "c12",
+      "question": "Are betting and wagering agreements enforceable?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "30"
+          ]
+        }
+      ],
+      "topic": "wager"
+    },
+    {
+      "id": "c13",
+      "question": "What happens if the terms of an agreement are uncertain?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "29"
+          ]
+        }
+      ],
+      "topic": "certainty"
+    },
+    {
+      "id": "c14",
+      "question": "Is an agreement restraining a person from marrying valid?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "26"
+          ]
+        }
+      ],
+      "topic": "restraint of marriage"
+    },
+    {
+      "id": "c15",
+      "question": "What compensation can I claim for breach of contract?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "73"
+          ]
+        }
+      ],
+      "topic": "damages"
+    },
+    {
+      "id": "c16",
+      "question": "Is a penalty clause for breach of contract enforceable in India?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "74"
+          ]
+        }
+      ],
+      "topic": "liquidated damages"
+    },
+    {
+      "id": "c17",
+      "question": "What happens to a contract if performance becomes impossible?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "56"
+          ]
+        }
+      ],
+      "topic": "frustration"
+    },
+    {
+      "id": "c18",
+      "question": "Is time of the essence in a contract, and what if a party is late?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "55"
+          ]
+        }
+      ],
+      "topic": "time of performance"
+    },
+    {
+      "id": "c19",
+      "question": "What is a contract of indemnity?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "124"
+          ]
+        }
+      ],
+      "topic": "indemnity"
+    },
+    {
+      "id": "c20",
+      "question": "What is a contract of guarantee and who is a surety?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "126"
+          ]
+        }
+      ],
+      "topic": "guarantee"
+    },
+    {
+      "id": "c21",
+      "question": "How can a continuing guarantee be revoked?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "130",
+            "131"
+          ]
+        }
+      ],
+      "topic": "guarantee"
+    },
+    {
+      "id": "c22",
+      "question": "What is the extent of a surety's liability?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "128"
+          ]
+        }
+      ],
+      "topic": "guarantee"
+    },
+    {
+      "id": "c23",
+      "question": "Is a surety discharged if the creditor changes the terms without consent?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "133"
+          ]
+        }
+      ],
+      "topic": "guarantee"
+    },
+    {
+      "id": "c24",
+      "question": "What is bailment?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "148"
+          ]
+        }
+      ],
+      "topic": "bailment"
+    },
+    {
+      "id": "c25",
+      "question": "How much care must a bailee take of goods bailed to him?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "151"
+          ]
+        }
+      ],
+      "topic": "bailment"
+    },
+    {
+      "id": "c26",
+      "question": "What is a pledge and who are the pawnor and pawnee?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "172"
+          ]
+        }
+      ],
+      "topic": "pledge"
+    },
+    {
+      "id": "c27",
+      "question": "What can a pawnee do if the pawnor defaults?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "176"
+          ]
+        }
+      ],
+      "topic": "pledge"
+    },
+    {
+      "id": "c28",
+      "question": "Can an agent act beyond his authority in an emergency?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "189"
+          ]
+        }
+      ],
+      "topic": "agency"
+    },
+    {
+      "id": "c29",
+      "question": "How is an agency terminated?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "201"
+          ]
+        }
+      ],
+      "topic": "agency"
+    },
+    {
+      "id": "c30",
+      "question": "Can an agent delegate his authority to someone else?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "190"
+          ]
+        }
+      ],
+      "topic": "agency"
+    },
+    {
+      "id": "c31",
+      "question": "What are the duties of someone who finds lost goods?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "71",
+            "168"
+          ]
+        }
+      ],
+      "topic": "finder of goods"
+    },
+    {
+      "id": "c32",
+      "question": "If someone benefits from a non-gratuitous act, must they pay for it?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "70"
+          ]
+        }
+      ],
+      "topic": "quasi-contract"
+    },
+    {
+      "id": "c33",
+      "question": "Who pays for necessaries supplied to a person incapable of contracting?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "68"
+          ]
+        }
+      ],
+      "topic": "quasi-contract"
+    },
+    {
+      "id": "c34",
+      "question": "When is communication of an acceptance complete?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "4"
+          ]
+        }
+      ],
+      "topic": "formation"
+    },
+    {
+      "id": "c35",
+      "question": "When can a proposal be revoked?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "5"
+          ]
+        }
+      ],
+      "topic": "formation"
+    },
+    {
+      "id": "c36",
+      "question": "Must an acceptance be absolute and unqualified?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "7"
+          ]
+        }
+      ],
+      "topic": "formation"
+    },
+    {
+      "id": "c37",
+      "question": "What is novation of a contract?",
+      "expected": [
+        {
+          "statute_slug": "indian-contract-act-1872",
+          "sections": [
+            "62"
+          ]
+        }
+      ],
+      "topic": "discharge"
+    },
+    {
+      "id": "t01",
+      "question": "What kinds of property can be transferred?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "6"
+          ]
+        }
+      ],
+      "topic": "transferability"
+    },
+    {
+      "id": "t02",
+      "question": "Can immoveable property be transferred orally?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "9"
+          ]
+        }
+      ],
+      "topic": "formalities"
+    },
+    {
+      "id": "t03",
+      "question": "Is a condition restraining the buyer from selling the property valid?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "10"
+          ]
+        }
+      ],
+      "topic": "restraint on alienation"
+    },
+    {
+      "id": "t04",
+      "question": "What is the rule against perpetuity in property transfers?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "14"
+          ]
+        }
+      ],
+      "topic": "perpetuity"
+    },
+    {
+      "id": "t05",
+      "question": "What protection does a buyer in possession under an unregistered agreement have?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "53A"
+          ]
+        }
+      ],
+      "topic": "part performance"
+    },
+    {
+      "id": "t06",
+      "question": "How is a sale of immoveable property defined?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "54"
+          ]
+        }
+      ],
+      "topic": "sale"
+    },
+    {
+      "id": "t07",
+      "question": "What are the rights and liabilities of a buyer and seller of immoveable property?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "55"
+          ]
+        }
+      ],
+      "topic": "sale"
+    },
+    {
+      "id": "t08",
+      "question": "What are the different kinds of mortgage?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "58"
+          ]
+        }
+      ],
+      "topic": "mortgage"
+    },
+    {
+      "id": "t09",
+      "question": "Can a mortgagor redeem the property after the due date?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "60"
+          ]
+        }
+      ],
+      "topic": "redemption"
+    },
+    {
+      "id": "t10",
+      "question": "What is a mortgage by deposit of title deeds?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "96"
+          ]
+        }
+      ],
+      "topic": "mortgage"
+    },
+    {
+      "id": "t11",
+      "question": "How is a lease of immoveable property defined?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "105"
+          ]
+        }
+      ],
+      "topic": "lease"
+    },
+    {
+      "id": "t12",
+      "question": "What notice is needed to terminate a monthly tenancy when there is no written agreement?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "106"
+          ]
+        }
+      ],
+      "topic": "notice to quit"
+    },
+    {
+      "id": "t13",
+      "question": "Does a lease for more than one year have to be in a registered instrument?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "107"
+          ]
+        }
+      ],
+      "topic": "lease formalities"
+    },
+    {
+      "id": "t14",
+      "question": "What are the rights and liabilities of a lessor and lessee?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "108"
+          ]
+        }
+      ],
+      "topic": "lease"
+    },
+    {
+      "id": "t15",
+      "question": "How does a lease of immoveable property come to an end?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "111"
+          ]
+        }
+      ],
+      "topic": "determination"
+    },
+    {
+      "id": "t16",
+      "question": "Can a landlord waive a notice to quit?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "113"
+          ]
+        }
+      ],
+      "topic": "notice to quit"
+    },
+    {
+      "id": "t17",
+      "question": "Is there relief against forfeiture of a lease for non-payment of rent?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "114"
+          ]
+        }
+      ],
+      "topic": "forfeiture"
+    },
+    {
+      "id": "t18",
+      "question": "What happens if a tenant stays on after the lease expires?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "116"
+          ]
+        }
+      ],
+      "topic": "holding over"
+    },
+    {
+      "id": "t19",
+      "question": "Do the lease provisions apply to agricultural leases?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "117"
+          ]
+        }
+      ],
+      "topic": "agricultural lease"
+    },
+    {
+      "id": "t20",
+      "question": "How is a gift of immoveable property defined?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "122"
+          ]
+        }
+      ],
+      "topic": "gift"
+    },
+    {
+      "id": "t21",
+      "question": "How must a gift of immoveable property be made?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "123"
+          ]
+        }
+      ],
+      "topic": "gift"
+    },
+    {
+      "id": "t22",
+      "question": "Can a gift be revoked once made?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "126"
+          ]
+        }
+      ],
+      "topic": "gift"
+    },
+    {
+      "id": "t23",
+      "question": "Can property be transferred while a suit about it is pending?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "52"
+          ]
+        }
+      ],
+      "topic": "lis pendens"
+    },
+    {
+      "id": "t24",
+      "question": "Is a transfer made to defraud creditors valid?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "53"
+          ]
+        }
+      ],
+      "topic": "fraudulent transfer"
+    },
+    {
+      "id": "t25",
+      "question": "What happens if property is sold by an ostensible owner?",
+      "expected": [
+        {
+          "statute_slug": "transfer-of-property-act-1882",
+          "sections": [
+            "41"
+          ]
+        }
+      ],
+      "topic": "ostensible owner"
+    },
+    {
+      "id": "r01",
+      "question": "Which documents must compulsorily be registered?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "17"
+          ]
+        }
+      ],
+      "topic": "compulsory registration"
+    },
+    {
+      "id": "r02",
+      "question": "Which documents may be registered optionally?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "18"
+          ]
+        }
+      ],
+      "topic": "optional registration"
+    },
+    {
+      "id": "r03",
+      "question": "Within what time must a document be presented for registration?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "23"
+          ]
+        }
+      ],
+      "topic": "time limit"
+    },
+    {
+      "id": "r04",
+      "question": "What is the effect of not registering a document that required registration?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "49"
+          ]
+        }
+      ],
+      "topic": "non-registration"
+    },
+    {
+      "id": "r05",
+      "question": "Where should a document relating to land be registered?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "28"
+          ]
+        }
+      ],
+      "topic": "place of registration"
+    },
+    {
+      "id": "r06",
+      "question": "Who may present a document for registration?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "32"
+          ]
+        }
+      ],
+      "topic": "presentation"
+    },
+    {
+      "id": "r07",
+      "question": "Can a will be deposited with the registrar?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "42"
+          ]
+        }
+      ],
+      "topic": "wills"
+    },
+    {
+      "id": "r08",
+      "question": "Is there a time limit for presenting a will for registration?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "27"
+          ]
+        }
+      ],
+      "topic": "wills"
+    },
+    {
+      "id": "r09",
+      "question": "From what date does a registered document take effect?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "47"
+          ]
+        }
+      ],
+      "topic": "operation"
+    },
+    {
+      "id": "r10",
+      "question": "What is the penalty for making a false statement to a registering officer?",
+      "expected": [
+        {
+          "statute_slug": "registration-act-1908",
+          "sections": [
+            "82"
+          ]
+        }
+      ],
+      "topic": "penalty"
+    },
+    {
+      "id": "s01",
+      "question": "Which instruments are chargeable with stamp duty?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "3"
+          ]
+        }
+      ],
+      "topic": "chargeability"
+    },
+    {
+      "id": "s02",
+      "question": "Who is liable to pay the stamp duty on an instrument?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "29"
+          ]
+        }
+      ],
+      "topic": "liability"
+    },
+    {
+      "id": "s03",
+      "question": "Can an unstamped document be used as evidence in court?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "35"
+          ]
+        }
+      ],
+      "topic": "admissibility"
+    },
+    {
+      "id": "s04",
+      "question": "How do I get a ruling on the correct stamp duty for a document?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "31"
+          ]
+        }
+      ],
+      "topic": "adjudication"
+    },
+    {
+      "id": "s05",
+      "question": "Can I get a refund for a spoiled stamp?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "49"
+          ]
+        }
+      ],
+      "topic": "allowance"
+    },
+    {
+      "id": "s06",
+      "question": "What happens when an improperly stamped instrument is produced before an officer?",
+      "expected": [
+        {
+          "statute_slug": "indian-stamp-act-1899",
+          "sections": [
+            "33"
+          ]
+        }
+      ],
+      "topic": "impounding"
+    },
+    {
+      "id": "i01",
+      "question": "Are electronic records legally recognised in India?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "4"
+          ]
+        }
+      ],
+      "topic": "e-records"
+    },
+    {
+      "id": "i02",
+      "question": "Are electronic signatures legally valid?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "5"
+          ]
+        }
+      ],
+      "topic": "e-signature"
+    },
+    {
+      "id": "i03",
+      "question": "Is a contract formed by email or electronic means valid?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "10A"
+          ]
+        }
+      ],
+      "topic": "e-contracts"
+    },
+    {
+      "id": "i04",
+      "question": "When is an electronic record attributed to the originator?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "11"
+          ]
+        }
+      ],
+      "topic": "attribution"
+    },
+    {
+      "id": "i05",
+      "question": "Where is an electronic record deemed to be despatched and received?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "13"
+          ]
+        }
+      ],
+      "topic": "despatch"
+    },
+    {
+      "id": "i06",
+      "question": "What is the penalty for damaging a computer or unauthorised access?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "43"
+          ]
+        }
+      ],
+      "topic": "penalty"
+    },
+    {
+      "id": "i07",
+      "question": "Is a company liable for failing to protect sensitive personal data?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "43A"
+          ]
+        }
+      ],
+      "topic": "data protection"
+    },
+    {
+      "id": "i08",
+      "question": "What is the punishment for identity theft?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "66C"
+          ]
+        }
+      ],
+      "topic": "offences"
+    },
+    {
+      "id": "i09",
+      "question": "What is the punishment for cheating by personation using a computer?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "66D"
+          ]
+        }
+      ],
+      "topic": "offences"
+    },
+    {
+      "id": "i10",
+      "question": "What is the punishment for publishing private images without consent?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "66E"
+          ]
+        }
+      ],
+      "topic": "privacy"
+    },
+    {
+      "id": "i11",
+      "question": "What is the punishment for cyber terrorism?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "66F"
+          ]
+        }
+      ],
+      "topic": "offences"
+    },
+    {
+      "id": "i12",
+      "question": "When is an intermediary not liable for third-party content?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "79"
+          ]
+        }
+      ],
+      "topic": "safe harbour"
+    },
+    {
+      "id": "i13",
+      "question": "Can the government order interception of electronic communications?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "69"
+          ]
+        }
+      ],
+      "topic": "interception"
+    },
+    {
+      "id": "i14",
+      "question": "Can the government order blocking of a website?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "69A"
+          ]
+        }
+      ],
+      "topic": "blocking"
+    },
+    {
+      "id": "i15",
+      "question": "What is the punishment for tampering with computer source code?",
+      "expected": [
+        {
+          "statute_slug": "information-technology-act-2000",
+          "sections": [
+            "65"
+          ]
+        }
+      ],
+      "topic": "offences"
+    },
+    {
+      "id": "d01",
+      "question": "On what grounds can personal data be processed?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "4"
+          ]
+        }
+      ],
+      "topic": "grounds"
+    },
+    {
+      "id": "d02",
+      "question": "What notice must be given before collecting personal data?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "5"
+          ]
+        }
+      ],
+      "topic": "notice"
+    },
+    {
+      "id": "d03",
+      "question": "What are the requirements for valid consent under the DPDP Act?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "6"
+          ]
+        }
+      ],
+      "topic": "consent"
+    },
+    {
+      "id": "d04",
+      "question": "When can personal data be processed without consent?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "7"
+          ]
+        }
+      ],
+      "topic": "legitimate uses"
+    },
+    {
+      "id": "d05",
+      "question": "What security safeguards must a data fiduciary put in place?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "8"
+          ]
+        }
+      ],
+      "topic": "obligations"
+    },
+    {
+      "id": "d06",
+      "question": "What are the rules for processing a child's personal data?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "9"
+          ]
+        }
+      ],
+      "topic": "children"
+    },
+    {
+      "id": "d07",
+      "question": "What extra obligations apply to a significant data fiduciary?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "10"
+          ]
+        }
+      ],
+      "topic": "SDF"
+    },
+    {
+      "id": "d08",
+      "question": "Can I ask a company what personal data it holds about me?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "11"
+          ]
+        }
+      ],
+      "topic": "access"
+    },
+    {
+      "id": "d09",
+      "question": "Can I have my personal data corrected or erased?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "12"
+          ]
+        }
+      ],
+      "topic": "correction"
+    },
+    {
+      "id": "d10",
+      "question": "How do I complain about how my personal data was handled?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "13"
+          ]
+        }
+      ],
+      "topic": "grievance"
+    },
+    {
+      "id": "d11",
+      "question": "Can I nominate someone to exercise my data rights if I die?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "14"
+          ]
+        }
+      ],
+      "topic": "nomination"
+    },
+    {
+      "id": "d12",
+      "question": "What are the duties of a data principal?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "15"
+          ]
+        }
+      ],
+      "topic": "duties"
+    },
+    {
+      "id": "d13",
+      "question": "Can personal data be transferred outside India?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "16"
+          ]
+        }
+      ],
+      "topic": "cross-border"
+    },
+    {
+      "id": "d14",
+      "question": "What penalties apply for breaching the DPDP Act?",
+      "expected": [
+        {
+          "statute_slug": "dpdp-act-2023",
+          "sections": [
+            "33"
+          ]
+        }
+      ],
+      "topic": "penalties"
+    }
+  ],
+  "adversarial": [
+    {
+      "id": "a01",
+      "question": "What did the Supreme Court hold in Kesavananda Bharati?",
+      "topic": "case law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a02",
+      "question": "What was decided in Shreya Singhal v Union of India?",
+      "topic": "case law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a03",
+      "question": "Is the right to privacy a fundamental right after Puttaswamy?",
+      "topic": "case law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a04",
+      "question": "What is the current GST rate on legal services?",
+      "topic": "tax",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a05",
+      "question": "What is the capital gains tax rate on selling a flat in Mumbai?",
+      "topic": "tax",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a06",
+      "question": "What are the income tax slabs for this financial year?",
+      "topic": "tax",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a07",
+      "question": "What is the stamp duty percentage in Maharashtra for a sale deed?",
+      "topic": "state rates",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a08",
+      "question": "What are the maximum fines under the GDPR?",
+      "topic": "foreign law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a09",
+      "question": "What does the California Consumer Privacy Act require?",
+      "topic": "foreign law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a10",
+      "question": "What are a director's duties under the UK Companies Act?",
+      "topic": "foreign law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a11",
+      "question": "What is the punishment for murder in India?",
+      "topic": "criminal law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a12",
+      "question": "How do I apply for anticipatory bail?",
+      "topic": "criminal law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a13",
+      "question": "What is the punishment for cheque bounce under section 138?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a14",
+      "question": "How do I invoke arbitration under the Arbitration and Conciliation Act?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a15",
+      "question": "What are the duties of a director under the Companies Act 2013?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a16",
+      "question": "How is gratuity calculated under the Payment of Gratuity Act?",
+      "topic": "labour law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a17",
+      "question": "How much maternity leave am I entitled to?",
+      "topic": "labour law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a18",
+      "question": "What is the provident fund contribution rate?",
+      "topic": "labour law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a19",
+      "question": "What are the grounds for divorce under the Hindu Marriage Act?",
+      "topic": "family law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a20",
+      "question": "How is maintenance calculated for a spouse?",
+      "topic": "family law",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a21",
+      "question": "How do I file a complaint under the Consumer Protection Act?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a22",
+      "question": "What are a builder's obligations under RERA?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a23",
+      "question": "What is the implied condition as to title in a sale of goods?",
+      "topic": "repealed out",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a24",
+      "question": "What are the rights of a partner under Indian partnership law?",
+      "topic": "repealed out",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a25",
+      "question": "Should I sign this lease agreement my landlord sent me?",
+      "topic": "opinion",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a26",
+      "question": "Which law firm in Delhi should I hire for a property dispute?",
+      "topic": "opinion",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a27",
+      "question": "Will I win my case if I sue my employer?",
+      "topic": "opinion",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a28",
+      "question": "What is the penalty for driving without a licence?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a29",
+      "question": "What are the fundamental rights under the Constitution of India?",
+      "topic": "constitution",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a30",
+      "question": "How do I register a trademark in India?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a31",
+      "question": "What is the limitation period for filing a civil suit?",
+      "topic": "other statute",
+      "expected": [],
+      "must_abstain": true
+    },
+    {
+      "id": "a32",
+      "question": "What is the current repo rate set by the RBI?",
+      "topic": "not law",
+      "expected": [],
+      "must_abstain": true
+    }
+  ]
+}

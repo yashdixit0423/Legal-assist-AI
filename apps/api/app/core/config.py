@@ -111,6 +111,12 @@ class Settings(BaseSettings):
     # A fixed host directory so the two model repositories download exactly
     # once and are reused by every later stage and by the container.
     MODEL_CACHE_DIR: Path = Path("var/model_cache")
+    # Torch device for the embedder and the cross-encoder. Defaults to "cpu"
+    # because that is what the container has; "auto" picks the best available
+    # accelerator on the host. Changing it changes float results very slightly,
+    # which matters because RERANK_SCORE_FLOOR is calibrated against them --
+    # the gold runner refuses to resume a checkpoint across a device change.
+    MODEL_DEVICE: Literal["cpu", "mps", "cuda", "auto"] = "cpu"
     EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=256)
 
     # -- corpus pipeline ---------------------------------------------------
@@ -162,6 +168,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
+
+    def resolve_device(self) -> str:
+        """The concrete torch device name, resolving ``auto``."""
+        if self.MODEL_DEVICE != "auto":
+            return self.MODEL_DEVICE
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
 
     def require_embed_revision(self) -> str:
         """The pinned embedding revision, or a loud failure.

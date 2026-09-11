@@ -30,3 +30,4 @@ var/corpus_archive/*
 .DS_Store
 .idea/
 .vscode/
+eval/gold/.checkpoints/

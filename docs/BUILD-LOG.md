@@ -1328,3 +1328,126 @@ stored key still gets a correct abstention for free.
   regenerate without a migration.
 - Verification now exists (`llm.probe`), so the gold-set runner can fail fast
   with a clear message when the key configured for it does not work.
+
+---
+
+## 2026-09-11 · Stage 8 — Gold set and metrics (measurement deferred to Stage 9)
+
+Branch `stage-8-eval`. 178 tests green. **The tooling is complete; the numbers
+are not measured yet** — see the decision below.
+
+### Built
+
+- **`eval/gold/gold-v1.json`** — 107 hand-labelled questions across all six
+  Acts plus 32 adversarial ones. Topics follow spec §10: notice periods,
+  non-compete enforceability, registration thresholds, stamp duty triggers,
+  data-protection consent. The adversarial half covers case law, foreign law,
+  tax rates, pure opinion, other statutes (NI Act s.138, Arbitration,
+  Companies Act, RERA) and — deliberately — two subjects *repealed out of* our
+  own corpus, Sale of Goods and Partnership, which are the sharpest possible
+  test of whether the gate knows the edge of what it holds.
+- **`services/eval/gold.py`** — recall@1/3/6/10/20, MRR, abstention accuracy,
+  false-abstention rate, latency p50/p95, plus a miss list and a
+  wrongly-answered list. No LLM anywhere: retrieval quality and abstention are
+  properties of the index and the gate, and measuring them must not need a
+  provider key.
+- **`legaledge-kb eval-gold --out … [--limit N] [--fresh]`**.
+- **`MODEL_DEVICE`** (`cpu` | `mps` | `cuda` | `auto`) — the torch device for
+  both models, previously hard-coded to `cpu` in Stages 3 and 4. Model caches
+  are keyed by device so switching cannot reuse a stale instance.
+- 23 tests.
+
+### Decisions
+
+**Labels are verified before anything is scored.** `load_gold` resolves every
+expected section against the database and raises listing each failure. A gold
+entry naming a section we do not hold is a defect in the gold set, not a
+retrieval miss, and scoring it as a miss would understate recall forever. All
+107 labels resolve, to 109 distinct sections.
+
+**Adversarial cases are scored on abstention, not retrieval,** and are excluded
+from the recall denominator. Including them would penalise the system for
+behaving correctly.
+
+**False-abstention rate is reported next to abstention accuracy.** A floor set
+high enough to refuse everything scores 100% on abstention accuracy. The rate
+at which answerable questions are refused is the cost of that, and the two
+numbers are meaningless apart.
+
+**The runner checkpoints, and the checkpoint filename fingerprints the
+configuration.** Each case is appended to a JSONL and flushed as it completes,
+so an interrupted run resumes rather than starting over. The fingerprint covers
+the gold file hash, the device, both model revisions, the score floor and the
+candidate counts — anything that can move a score. A changed configuration
+therefore starts a *new* checkpoint file rather than silently resuming into the
+old one. That matters more than it looks: blending CPU and MPS scores into one
+recall figure would put two measuring instruments behind one number, and a case
+sitting near the 0.30 floor could flip for reasons unrelated to retrieval.
+
+**The explanations batch job is ⏭ Deferred**, per the scope cut of 2026-09-11.
+`section_explanations` stays empty and prompt-versioned, so it remains additive.
+
+**Ragas is ⏭ Deferred**, same cut.
+
+### The measurement is deferred to Stage 9, and why
+
+A full run was started and abandoned at 71 of 139 cases. It was not going to
+finish in reasonable time, and the numbers it would have produced were partly
+worthless:
+
+| Window | Rate |
+|---|---|
+| First quarter | 45 s/case |
+| Second quarter | 34 s/case |
+| Third quarter | 57 s/case |
+| Last 10 cases | **102 s/case** |
+
+The work was not getting harder — the machine was getting busier. The process
+held 372% CPU at the start and 130-205% an hour in, with a load average of 18.5
+across an M1's 8 cores. So the latency percentiles this run would have produced
+describe *a contended laptop*, not the deployable system, and I had earlier
+argued the opposite to justify staying on CPU. That argument was wrong and is
+withdrawn here.
+
+Recall, MRR and abstention accuracy are the durable metrics and barely depend
+on the device. The sensible order is therefore: fix the reranker's speed in
+Stage 9 — where `/v1/ask` at 38-55 s against a 400 ms target is already the
+headline defect — then measure once, cleanly, on the improved configuration.
+
+**Two process failures of mine are recorded here rather than smoothed over:**
+
+1. **I shipped a two-hour job with no checkpointing.** The 71 completed cases
+   were held in memory and lost on exit. The rest of the pipeline is resumable
+   by design (Stage 3's embedding pass uses an `embedding IS NULL` work queue);
+   the gold runner was the one long job I wrote without it. Now fixed.
+2. **I estimated remaining time from a cumulative average while the rate was
+   degrading**, and quoted 65 minutes when the honest figure from the recent
+   window was more than double that. Percentiles over a moving rate are a
+   forecast, not a measurement, and should have been labelled as such.
+
+### Known gaps at the end of Stage 8
+
+- **No measured recall, MRR, abstention accuracy or latency.** Spec §10's
+  acceptance criteria (recall@6 ≥ 85%, abstention ≥ 95%) are consequently
+  **unverified**. This is the stage's headline deliverable and it is owed.
+- **The gold set is 107 + 32, not the spec's 120 + 60.** Six Acts rather than
+  twenty is most of the reason; every label being hand-checked against real
+  text is the rest.
+- **Citation correctness (≥ 90%, human scoring of 150 answers) is not
+  attempted** and cannot be until generation is verified — see the key gap.
+- **Parser fidelity** is one Act (DPDP), per the agreed cut, not two.
+- Still carried and unfixed: `LLM_API_KEY` empty, so generation, streamed
+  tokens and live citation validation remain unverified; `/v1/ask` latency;
+  `.env` port 5432 vs container 5433; `ask_logs` records nothing for
+  402/provider errors; no token revocation; Part/Chapter tree blocked on
+  absent source data; LiteLLM's pricing fetch on the request path.
+
+### What Stage 9 needs
+
+- The reranker's speed is now on the critical path for two separate reasons:
+  the latency NFR and the gold measurement. `MODEL_DEVICE=mps` is a one-line
+  experiment on this host; ONNX Runtime with int8 is the container-friendly
+  option; cutting `RETRIEVAL_TOP_K` trades recall for time and should be
+  measured, not assumed.
+- After that, one clean `legaledge-kb eval-gold --fresh` run produces every
+  number this stage owes.

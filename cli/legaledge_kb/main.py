@@ -7,6 +7,7 @@ advertises a no-op.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -193,6 +194,105 @@ def stats() -> None:
         "HNSW index", "ready" if summary.vector_index_ready else "[yellow]absent[/yellow]"
     )
     console.print(index_table)
+
+
+@app.command("eval-gold")
+def eval_gold(
+    path: Annotated[Path, typer.Option("--gold", help="Gold set JSON.")] = Path(
+        "eval/gold/gold-v1.json"
+    ),
+    out: Annotated[Path | None, typer.Option("--out", help="Write the JSON report here.")] = None,
+    limit: Annotated[
+        int | None, typer.Option("--limit", help="Run only the first N cases.")
+    ] = None,
+    fresh: Annotated[
+        bool, typer.Option("--fresh", help="Ignore any checkpoint and start over.")
+    ] = False,
+) -> None:
+    """Score retrieval and abstention against the hand-labelled gold set.
+
+    No LLM is called: recall and abstention accuracy are properties of the
+    index and the gate, and measuring them must not need a provider key.
+
+    Resumable: each case is checkpointed as it completes, under a filename
+    that fingerprints the configuration it was measured with, so an
+    interrupted run continues and a changed configuration starts clean.
+    """
+    import asyncio
+    import json as _json
+
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+    from app.services.eval.gold import checkpoint_path, run_gold, to_dict
+
+    settings = get_settings()
+
+    async def _run() -> dict[str, object]:
+        engine = create_async_engine(settings.database_url_async)
+        try:
+            async with AsyncSession(engine) as session:
+                return to_dict(
+                    await run_gold(
+                        settings=settings,
+                        session=session,
+                        path=path,
+                        limit=limit,
+                        fresh=fresh,
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    try:
+        summary = asyncio.run(_run())
+    except CorpusError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    console.print(f"[dim]checkpoint: {checkpoint_path(settings, path)}[/dim]")
+    table = Table("metric", "value", title="Gold set")
+    table.add_row(
+        "cases",
+        f"{summary['cases']} ({summary['in_corpus']} labelled, "
+        f"{summary['adversarial']} adversarial)",
+    )
+    for k, v in summary["recall"].items():
+        table.add_row(f"recall{k}", f"{v:.1%}")
+    table.add_row("MRR", f"{summary['mrr']:.4f}")
+    table.add_row("abstention accuracy", f"{summary['abstention_accuracy']:.1%}")
+    table.add_row("false abstention rate", f"{summary['false_abstention_rate']:.1%}")
+    table.add_row(
+        "latency p50 / p95",
+        f"{summary['latency_ms']['p50']} ms / {summary['latency_ms']['p95']} ms",
+    )
+    console.print(table)
+
+    if summary["misses"]:
+        miss = Table("id", "topic", "rank", "abstained", "question", title="Missed (not in top 6)")
+        for m in summary["misses"]:
+            miss.add_row(
+                m["id"],
+                m["topic"],
+                str(m["rank_of_first_correct"]),
+                str(m["abstained"]),
+                m["question"][:58],
+            )
+        console.print(miss)
+    if summary["wrongly_answered"]:
+        bad = Table("id", "topic", "top score", "question", title="Out-of-corpus NOT refused")
+        for m in summary["wrongly_answered"]:
+            bad.add_row(
+                m["id"],
+                m["topic"],
+                f"{m['top_score']:.4f}" if m["top_score"] else "-",
+                m["question"][:58],
+            )
+        console.print(bad)
+
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(_json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        console.print(f"report written to {out}")
 
 
 @app.command()
