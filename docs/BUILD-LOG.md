@@ -1036,3 +1036,129 @@ warm-up in Stage 9 so the first user of a fresh process does not pay it.
 - `ask_logs` is ready and anonymous by construction; `AskResult` already carries
   every column it needs (`top_score`, `citation_violation`, `model`, tokens,
   `latency_ms`).
+
+---
+
+## 2026-09-11 · Stage 6 — SSE streaming, query rewriting, ask_logs
+
+Branch `stage-6-streaming`. `/v1/ask` now streams, folds prior turns into a
+standalone question, and writes one anonymous row per question. 134 tests green.
+
+### Built
+
+- **SSE on `POST /v1/ask`**, selected by the `Accept` header:
+  `text/event-stream` streams, anything else returns the Stage 4 JSON body.
+  Events: `sources`, `token`, `citation`, `invalidated`, `abstain`, `error`,
+  `done`. 15-second pings, `Cache-Control: no-store`, `X-Accel-Buffering: no`.
+- **`services/answer/rewrite.py`** — spec §05 step 1. Skipped when there are no
+  turns; disabled by `REWRITE_ENABLED`; own model and timeout via
+  `REWRITE_MODEL` / `REWRITE_TIMEOUT_SECONDS`.
+- **`llm.stream()`** — deltas, then a final `Completion` carrying the assembled
+  text and usage, so the validator never has to reassemble the deltas itself
+  and risk disagreeing with what was actually sent.
+- **`write_ask_log`** — spec §05 step 9.
+- `tests/unit/test_streaming.py` (11 tests).
+
+### Decisions
+
+**One prologue, two transports.** `_prepare()` does rewrite → retrieve → rerank
+→ gate → expand → pack, and both `answer_question` and `stream_answer` call it.
+A grounding guarantee that holds on the JSON path and not the SSE path is not a
+guarantee, and the only way to be sure is for there to be one copy of the code
+that produces the allowed citation set.
+
+**Citations are validated mid-stream, not only at the end.** This is the
+stage's main design decision. Streaming freely and checking afterwards puts a
+fabricated section number on a lawyer's screen and retracts it a second later,
+which is worse than being slow. Instead the delta buffer is checked after every
+chunk, and the moment a *closed* `[S…]` id appears that was not in the prompt
+the stream is abandoned mid-sentence and an `invalidated` event tells the client
+to discard what it has rendered. The single permitted retry then runs
+**buffered**, so the corrected answer is only sent once it is known clean, and
+arrives as one `token` event with `replaces_all: true`.
+
+Only closed citations trip the guard. `[S10` is the start of a permitted
+`[S1046]` as often as a fabricated one, and tripping on the prefix would
+abandon valid answers. A test pins that, and another test asserts the
+mid-stream guard and the buffered validator return the same verdict on the same
+text — if those ever disagree, the two transports have different safety
+properties.
+
+**Rewriting fails open, always.** A rewrite that errors, times out, returns
+empty or returns 400+ characters of self-explanation leaves the original
+question in place. Verified live: with no key configured, the rewrite logged
+`rewrite_failed missing_provider_key`, retrieval ran on the original question
+and the gate still passed. A missing key must not be the thing that turns a
+request the abstention path could have served for free into a 402.
+
+**`turns` are still never stored.** They arrive in the body, feed the rewrite,
+and are discarded. `ask_logs` keeps the original question and the rewritten one
+— not the conversation.
+
+**`ask_logs` is written on its own session**, outside the request session, and
+a failure to write it is logged and swallowed. Evaluation data is not the
+product; losing a row must not fail a user's question.
+
+### Evidence — live
+
+```
+SSE, out-of-corpus ("capital gains tax rate in India")
+  200  content-type: text/event-stream; charset=utf-8
+  : ping
+  event: abstain   {"reason":"below_score_floor", ...}
+  event: done      {"answered":false,"abstained":true,"prompt_version":"ask-v1", ...}
+
+SSE, in-corpus ("when must a lease of immoveable property be registered")
+  200
+  event: sources   9 blocks, first is Registration Act, 1908 s.2
+  event: error     {"code":"missing_provider_key", ...}     <- no key configured
+
+JSON, with two prior turns ("and the notice period?")
+  rewrite_failed missing_provider_key  -> original question kept
+  hybrid 49 candidates, rerank top 0.4417, 14 blocks / 11,598 tokens packed
+  402 missing_provider_key
+```
+
+`ask_logs` after the run: one row, for the abstention.
+
+```
+question="What is the capital gains tax rate in India?"  rewritten=NULL
+answered=false  abstained=true  top_score=0.0023  citation_violation=false
+latency_ms=48287    user-ish columns: []    foreign keys: 0
+```
+
+### Known gaps at the end of Stage 6
+
+- **Streaming of a real answer is unverified.** Same root cause as Stage 4:
+  `LLM_API_KEY` is empty, so no `token` event carrying model output has ever
+  been produced, and neither has the `invalidated` → retry path. The guard
+  logic is unit-tested against both valid and fabricated text; the wire path
+  for a successful answer is not. This is now the **only** significant
+  unverified area in the build.
+- **A 402 or provider error writes no `ask_logs` row.** Only answers and
+  abstentions are logged, because those are the two states spec §06's column
+  set models. Stage 8's metrics will therefore undercount *attempted*
+  questions. Flagged rather than fixed: adding an `errored` state is a schema
+  decision, not a code one.
+- **`turns_used` / `rewritten_question` are unexercised end to end** for the
+  same key reason; the fail-open path is verified, the success path is not.
+- **The context budget is starting to bite.** The turns question packed 14
+  blocks at 11,598 tokens against a 12,000 budget. One more cross-referenced
+  section and blocks would have been dropped. Worth raising `CONTEXT_BUDGET_TOKENS`
+  once a real model is answering and the true cost is visible.
+- Still carried, unfixed, at the owner's instruction: `.env` port 5432 vs
+  container 5433; `LLM_API_KEY` empty; `/v1/ask` at 46-55 s against a 400 ms
+  target (this stage measured 38-48 s again); the Part/Chapter tree blocked on
+  absent source data; LiteLLM's pricing fetch on the request path.
+
+### What Stage 7 needs
+
+- `users` and `api_credentials` are unchanged since Stage 1 and still empty, so
+  auth is additive rather than a migration rewrite, as intended.
+- `llm.complete` and `llm.stream` both take their key from
+  `require_api_key(settings)` in one place. Per-user BYOK means changing that
+  one function to take a resolved credential, not touching the pipeline.
+- `CREDENTIAL_ENC_KEY` is already validated as 32 base64 bytes at startup.
+- `ask_logs` must stay anonymous when auth arrives. There is a test asserting
+  the table has no `user_id` and no foreign keys; it should be left in place
+  precisely because Stage 7 is when someone would be tempted to add one.

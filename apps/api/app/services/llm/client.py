@@ -11,6 +11,7 @@ frontend routes those to Settings, and it can only do so if they arrive as
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from app.core.config import Settings
@@ -49,29 +50,53 @@ def require_api_key(settings: Settings) -> str:
     return key
 
 
-async def complete(settings: Settings, messages: list[dict[str, str]]) -> Completion:
-    """One non-streaming completion. Streaming arrives with SSE in Stage 6."""
-    import litellm
+def _translate(exc: Exception) -> Exception:
+    """Map a LiteLLM failure onto our typed hierarchy.
+
+    One translation table shared by the streaming and non-streaming paths, so
+    a provider error means the same thing to a client either way.
+    """
     from litellm import exceptions as llm_errors
+
+    detail = {"provider_message": str(exc)[:200]}
+    if isinstance(exc, llm_errors.AuthenticationError):
+        return InvalidProviderKeyError(details=detail)
+    if isinstance(exc, llm_errors.RateLimitError):
+        return ProviderQuotaError(details=detail)
+    if isinstance(exc, llm_errors.Timeout):
+        return ProviderTimeoutError(details=detail)
+    if isinstance(exc, llm_errors.APIError):
+        return ProviderError(details=detail)
+    return exc
+
+
+async def complete(
+    settings: Settings,
+    messages: list[dict[str, str]],
+    *,
+    model: str | None = None,
+    max_tokens: int | None = None,
+    timeout_seconds: float | None = None,
+) -> Completion:
+    """One non-streaming completion.
+
+    The overrides exist for query rewriting, which wants a cheaper model and a
+    shorter leash than an answer does.
+    """
+    import litellm
 
     api_key = require_api_key(settings)
     try:
         response = await litellm.acompletion(
-            model=settings.LLM_MODEL,
+            model=model or settings.LLM_MODEL,
             messages=messages,
             api_key=api_key,
             temperature=settings.LLM_TEMPERATURE,
-            max_tokens=settings.LLM_MAX_OUTPUT_TOKENS,
-            timeout=settings.LLM_TIMEOUT_SECONDS,
+            max_tokens=max_tokens or settings.LLM_MAX_OUTPUT_TOKENS,
+            timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
         )
-    except llm_errors.AuthenticationError as exc:
-        raise InvalidProviderKeyError(details={"provider_message": str(exc)[:200]}) from exc
-    except llm_errors.RateLimitError as exc:
-        raise ProviderQuotaError(details={"provider_message": str(exc)[:200]}) from exc
-    except llm_errors.Timeout as exc:
-        raise ProviderTimeoutError(details={"provider_message": str(exc)[:200]}) from exc
-    except llm_errors.APIError as exc:
-        raise ProviderError(details={"provider_message": str(exc)[:200]}) from exc
+    except Exception as exc:
+        raise _translate(exc) from exc
 
     usage = getattr(response, "usage", None)
     text = (response.choices[0].message.content or "").strip()
@@ -88,3 +113,52 @@ async def complete(settings: Settings, messages: list[dict[str, str]]) -> Comple
         tokens_out=completion.tokens_out,
     )
     return completion
+
+
+async def stream(
+    settings: Settings, messages: list[dict[str, str]]
+) -> AsyncIterator[str | Completion]:
+    """Yield text deltas as they arrive, then one final :class:`Completion`.
+
+    The trailing Completion carries the assembled text and the usage numbers,
+    so a caller that needs the whole answer — the citation validator does —
+    does not have to reassemble the deltas itself and risk disagreeing with
+    what was actually sent.
+    """
+    import litellm
+
+    api_key = require_api_key(settings)
+    chunks: list[str] = []
+    usage = None
+    model = settings.LLM_MODEL
+    try:
+        response = await litellm.acompletion(
+            model=settings.LLM_MODEL,
+            messages=messages,
+            api_key=api_key,
+            temperature=settings.LLM_TEMPERATURE,
+            max_tokens=settings.LLM_MAX_OUTPUT_TOKENS,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        async for part in response:
+            usage = getattr(part, "usage", None) or usage
+            model = str(getattr(part, "model", model) or model)
+            choices = getattr(part, "choices", None)
+            if not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            text = getattr(delta, "content", None) if delta else None
+            if text:
+                chunks.append(text)
+                yield text
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+    yield Completion(
+        text="".join(chunks).strip(),
+        model=model,
+        tokens_in=getattr(usage, "prompt_tokens", None),
+        tokens_out=getattr(usage, "completion_tokens", None),
+    )

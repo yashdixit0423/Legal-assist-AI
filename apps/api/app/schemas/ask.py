@@ -1,9 +1,9 @@
 """Request and response shapes for ``POST /v1/ask``.
 
-Plain JSON in this stage. SSE, query rewriting from ``turns`` and the
-``ask_logs`` row are Stage 6; ``turns`` is accepted now so the contract does
-not change under the client later, and the response says plainly that it was
-not used.
+Transport is chosen by the ``Accept`` header: ``text/event-stream`` streams,
+anything else returns this JSON body. ``turns`` are client-held history — they
+arrive in the request body, are used to rewrite the question, and are never
+stored.
 """
 
 from __future__ import annotations
@@ -79,5 +79,8 @@ class AskResponse(BaseModel):
     tokens_out: int | None = None
     latency_ms: int
     turns_used: bool = Field(
-        default=False, description="Always false until query rewriting lands in Stage 6."
+        default=False, description="True when prior turns changed the question actually searched."
+    )
+    rewritten_question: str | None = Field(
+        default=None, description="The standalone question retrieval ran against, if rewritten."
     )

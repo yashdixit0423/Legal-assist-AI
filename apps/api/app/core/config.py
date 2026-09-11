@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     LLM_MAX_OUTPUT_TOKENS: int = Field(default=1200, ge=64, le=16_000)
     LLM_TIMEOUT_SECONDS: float = Field(default=60.0, ge=1.0, le=600.0)
 
+    # -- query rewriting (spec 05 step 1) ----------------------------------
+    # Only runs when the request carries prior turns. Empty REWRITE_MODEL
+    # means "use LLM_MODEL"; a cheaper model is the point of the knob.
+    REWRITE_ENABLED: bool = True
+    REWRITE_MODEL: str = ""
+    REWRITE_MAX_TOKENS: int = Field(default=160, ge=32, le=1000)
+    REWRITE_TIMEOUT_SECONDS: float = Field(default=15.0, ge=1.0, le=120.0)
+
     # -- model weights -----------------------------------------------------
     # A fixed host directory so the two model repositories download exactly
     # once and are reused by every later stage and by the container.
@@ -165,6 +173,11 @@ class Settings(BaseSettings):
         return _require_revision(
             "EMBED_MODEL_REVISION", self.EMBED_MODEL, self.EMBED_MODEL_REVISION
         )
+
+    @property
+    def rewrite_model(self) -> str:
+        """The model used for query rewriting, defaulting to the answer model."""
+        return self.REWRITE_MODEL.strip() or self.LLM_MODEL
 
     def require_rerank_revision(self) -> str:
         """The pinned reranker revision, or a loud failure. See above."""
