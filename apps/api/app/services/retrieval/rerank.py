@@ -41,8 +41,10 @@ def get_reranker(settings: Settings) -> Any:
     """The cross-encoder, on CPU, at the pinned revision."""
     revision = settings.require_rerank_revision()
     device = settings.resolve_device()
-    key = (settings.RERANK_MODEL, f"{revision}@{device}")
+    dtype = settings.RERANK_DTYPE
+    key = (settings.RERANK_MODEL, f"{revision}@{device}:{dtype}")
     if key not in _RERANKERS:
+        import torch
         from sentence_transformers import CrossEncoder
 
         logger.info(
@@ -50,12 +52,17 @@ def get_reranker(settings: Settings) -> Any:
             model=settings.RERANK_MODEL,
             revision=revision[:12],
             device=device,
+            dtype=dtype,
         )
+        model_kwargs: dict[str, Any] = {}
+        if dtype != "float32":
+            model_kwargs["torch_dtype"] = getattr(torch, dtype)
         _RERANKERS[key] = CrossEncoder(
             settings.RERANK_MODEL,
             revision=revision,
             device=device,
             max_length=512,
+            automodel_args=model_kwargs or None,
         )
     return _RERANKERS[key]
 

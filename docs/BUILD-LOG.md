@@ -1872,3 +1872,50 @@ the first evidence that exists for the claim at all.
   `invalidated` → retry path has still never fired, because the model has not
   yet produced a bad citation — it cannot be forced without a stub, and a stub
   would only re-test the unit tests.
+
+---
+
+## 2026-09-11 · bge on an 8 GB host — four attempts, and ADR 0004
+
+The bge gold run was attempted in four configurations and abandoned. Recorded
+in full because the conclusion is a design decision, not a failure to try.
+
+| Precision | Device | s/case | 139 cases |
+|---|---|---:|---:|
+| float32 | CPU | 88 | 204 min |
+| float32 | MPS | 300 | 695 min |
+| float16 | MPS | 47 | 109 min |
+| float16 | CPU | — | unusable (123 s per 30 pairs) |
+
+All four swapped — `state=U`, resident set collapsed, swap past 5 GB. In
+isolation the same model does 30 pairs in 6.1 s on MPS/fp16, projecting ~14 min
+for the set; the difference between 14 and 109 minutes is swap.
+
+**Two corrections to things I said earlier in this build.**
+
+First, **capping Docker Desktop's memory would not have helped, and I
+recommended it twice before checking.** Docker reports a 3.82 GB ceiling, which
+I read as a reservation. Its actual host footprint is **1.28 GB** — 782 MB of
+Virtualization.framework plus helpers — and Postgres inside it uses 58 MB.
+Capping to 1 GB would have freed 200-300 MB against bge's 2.1 GB need. The real
+constraint is an 8 GB machine with ~1.1 GB of desktop application resident and
+several gigabytes already swapped.
+
+Second, **float16 is not a general memory fix.** On CPU it is 10× *slower* than
+float32, because PyTorch emulates half precision there. It only helps beside an
+accelerator. `RERANK_DTYPE` now exists with that caveat in its docstring, and
+the gold fingerprint covers it.
+
+Precision was never the risk: the same pair scores 0.6276 (fp32/CPU), 0.6274
+(fp16/CPU) and 0.6279 (fp16/MPS).
+
+**ADR 0004** records the outcome: mini is the default reranker below ~12 GB of
+usable memory, bge stays preferred where memory allows and one env change away,
+and every reported number must name its reranker. ADR 0001's quality argument
+is not disputed — only its premise that we were not size-constrained.
+
+**Standing lesson from this session, since it recurred four times:** a
+microbenchmark of one model on a momentarily quiet machine predicts nothing
+about a batch job on a loaded one. Every projection I made from one
+(29 min, 14 min, "3-8× for MPS") was wrong by 3× to 8×, always in the same
+direction. The 20-case probe was the only estimate that held, and it is cheap.

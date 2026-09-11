@@ -333,6 +333,7 @@ def fingerprint(settings: Settings, gold_path: Path) -> str:
             "device": settings.resolve_device(),
             "embed": f"{settings.EMBED_MODEL}@{settings.EMBED_MODEL_REVISION}",
             "rerank": f"{settings.RERANK_MODEL}@{settings.RERANK_MODEL_REVISION}",
+            "rerank_dtype": settings.RERANK_DTYPE,
             "top_k": settings.RETRIEVAL_TOP_K,
             "candidates": settings.RERANK_CANDIDATES,
         },

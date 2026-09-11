@@ -122,6 +122,15 @@ class Settings(BaseSettings):
     # which matters because RERANK_SCORE_FLOOR is calibrated against them --
     # the gold runner refuses to resume a checkpoint across a device change.
     MODEL_DEVICE: Literal["cpu", "mps", "cuda", "auto"] = "cpu"
+    # Weight precision for the cross-encoder. float32 is the default because it
+    # is what the models were measured with. float16 halves the resident size
+    # -- bge-reranker-v2-m3 goes from 2.1 GB to ~1.05 GB -- which is the
+    # difference between running and swapping on an 8 GB host. CPU float16
+    # arithmetic can be slower per operation, but avoiding swap dominates that
+    # by an order of magnitude. Scores shift in the last decimal, so the score
+    # floor should be re-checked after changing this; the gold checkpoint
+    # fingerprints it for exactly that reason.
+    RERANK_DTYPE: Literal["float32", "float16", "bfloat16"] = "float32"
     EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=256)
 
     # -- rate limiting (spec 06) -------------------------------------------
