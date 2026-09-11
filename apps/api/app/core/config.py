@@ -82,7 +82,12 @@ class Settings(BaseSettings):
     # -- retrieval tuning --------------------------------------------------
     RETRIEVAL_TOP_K: int = Field(default=30, ge=1, le=200)
     RERANK_TOP_N: int = Field(default=6, ge=1, le=50)
-    RERANK_SCORE_FLOOR: float = Field(default=0.30, ge=0.0, le=1.0)
+    # Calibrated against the 139-case gold set, not guessed. At 0.60 the
+    # abstention accuracy is 96.9% (spec 10 wants >=95%) and 8.4% of answerable
+    # questions are refused. 0.65 and 0.70 give the same 96.9% for more false
+    # refusals, so they are strictly worse; 0.75 reaches 100% but refuses 14%.
+    # Model-specific: this is nyaya-reranker-mini-v1's number. See ADR 0004.
+    RERANK_SCORE_FLOOR: float = Field(default=0.60, ge=0.0, le=1.0)
     MAX_CHUNK_TOKENS: int = Field(default=450, ge=64, le=EMBED_MODEL_MAX_TOKENS)
     # Reciprocal Rank Fusion constant. 60 is the value from the original paper
     # and the one spec §05 names; it damps the influence of a single retriever
