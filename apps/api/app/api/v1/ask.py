@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser
+from app.core import ratelimit
 from app.core.config import Settings, get_settings
 from app.core.errors import LegalEdgeError
 from app.core.logging import get_logger
@@ -93,6 +94,15 @@ async def ask(
     A 200 with ``abstained: true`` is a successful outcome, not a failure: the
     corpus does not cover the question and no model was called.
     """
+    if settings.RATE_LIMIT_ENABLED:
+        # Keyed on the account, not the address: the cost being limited is a
+        # provider call made with this user's key.
+        await ratelimit.enforce(
+            settings,
+            key=f"ask:{user.id}",
+            limit=settings.RATE_LIMIT_ASK_PER_HOUR,
+            window_seconds=3600,
+        )
     api_key = await _resolve_key(settings, user)
     if "text/event-stream" in accept.lower():
         return EventSourceResponse(

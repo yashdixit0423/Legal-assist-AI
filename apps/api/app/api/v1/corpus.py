@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import client_ip
+from app.core import ratelimit
+from app.core.caching import apply_cache_headers
 from app.core.config import Settings, get_settings
 from app.db.models import Statute, StatuteSection
 from app.db.session import get_session
@@ -84,9 +87,13 @@ async def _detail(
 
 
 @router.get("/statutes", response_model=list[StatuteSummary], summary="List indexed Acts")
-async def list_statutes(session: SessionDep) -> list[StatuteSummary]:
+async def list_statutes(
+    session: SessionDep, request: Request, response: Response
+) -> list[StatuteSummary]:
     """Every Act in the corpus. No key required."""
-    return [_summary(statute) for statute in await corpus_read.list_statutes(session)]
+    payload = [_summary(statute) for statute in await corpus_read.list_statutes(session)]
+    apply_cache_headers(request, response, payload)
+    return payload
 
 
 @router.get(
@@ -95,7 +102,9 @@ async def list_statutes(session: SessionDep) -> list[StatuteSummary]:
     summary="One Act, with its section index",
     responses={404: {"description": "No indexed Act with that slug."}},
 )
-async def get_statute(slug: str, session: SessionDep) -> StatuteDetail:
+async def get_statute(
+    slug: str, session: SessionDep, request: Request, response: Response
+) -> StatuteDetail:
     """One Act and everything needed to navigate it.
 
     ``parts`` is empty and ``parts_available`` is false: India Code's API
@@ -107,7 +116,7 @@ async def get_statute(slug: str, session: SessionDep) -> StatuteDetail:
     statute = await corpus_read.get_statute(session, slug)
     sections = await corpus_read.section_index(session, statute.id)
     total, in_force = await corpus_read.section_counts(session, statute.id)
-    return StatuteDetail(
+    detail = StatuteDetail(
         **_summary(statute).model_dump(),
         parts=[],
         parts_available=False,
@@ -123,6 +132,8 @@ async def get_statute(slug: str, session: SessionDep) -> StatuteDetail:
         sections_total=total,
         sections_in_force=in_force,
     )
+    apply_cache_headers(request, response, detail)
+    return detail
 
 
 @router.get(
@@ -143,10 +154,14 @@ async def get_section_by_number(slug: str, section_no: str, session: SessionDep)
     summary="One section by id — what a citation chip resolves against",
     responses={404: {"description": "No section with that id."}},
 )
-async def get_section(section_id: int, session: SessionDep) -> SectionDetail:
+async def get_section(
+    section_id: int, session: SessionDep, request: Request, response: Response
+) -> SectionDetail:
     """The id form used by ``[S<section_id>]`` citations in an answer."""
     section, statute = await corpus_read.get_section_by_id(session, section_id)
-    return await _detail(session, section, statute)
+    detail = await _detail(session, section, statute)
+    apply_cache_headers(request, response, detail)
+    return detail
 
 
 @router.post(
@@ -155,9 +170,16 @@ async def get_section(section_id: int, session: SessionDep) -> SectionDetail:
     summary="Keyword and semantic search across the corpus",
 )
 async def search(
-    payload: SearchRequest, session: SessionDep, settings: SettingsDep
+    payload: SearchRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> SearchResponse:
     """Hybrid search, one row per section. No LLM, no key, no reranker."""
+    if settings.RATE_LIMIT_ENABLED:
+        await ratelimit.enforce(
+            settings,
+            key=f"search:{client_ip(request)}",
+            limit=settings.RATE_LIMIT_SEARCH_PER_MINUTE,
+            window_seconds=60,
+        )
     hits = await corpus_read.search_corpus(
         session,
         settings,
@@ -192,6 +214,7 @@ async def search(
     summary="Search by query string — the GET form, for links and caching",
 )
 async def search_get(
+    request: Request,
     session: SessionDep,
     settings: SettingsDep,
     q: Annotated[str, Query(min_length=2, max_length=500)],
@@ -200,5 +223,5 @@ async def search_get(
 ) -> SearchResponse:
     """Same search, addressable by URL so a result page can be linked."""
     return await search(
-        SearchRequest(q=q, statute_slug=statute_slug, limit=limit), session, settings
+        SearchRequest(q=q, statute_slug=statute_slug, limit=limit), request, session, settings
     )

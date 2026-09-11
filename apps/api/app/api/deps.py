@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -44,3 +44,17 @@ async def current_user(
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+def client_ip(request: Request) -> str:
+    """The caller's address, trusting one proxy hop.
+
+    Caddy sets ``X-Forwarded-For`` in the production overlay. Only the first
+    entry is used and only the leftmost hop is trusted: the header is
+    client-settable, so treating the whole chain as authentic would let anyone
+    forge a fresh identity per request and walk around the limit entirely.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"

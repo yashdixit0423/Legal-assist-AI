@@ -205,7 +205,13 @@ def test_the_fingerprint_changes_when_the_device_changes(settings_env, tmp_path,
     gold = tmp_path / "g.json"
     gold.write_text('{"in_corpus": [], "adversarial": []}', encoding="utf-8")
 
+    # Pin the baseline rather than inheriting the developer's .env: this host
+    # runs MODEL_DEVICE=mps, and a test that assumes cpu passes or fails
+    # depending on whose machine it is.
+    monkeypatch.setenv("MODEL_DEVICE", "cpu")
+    reset_settings_cache()
     before = fingerprint(get_settings(), gold)
+
     monkeypatch.setenv("MODEL_DEVICE", "mps")
     reset_settings_cache()
     assert fingerprint(get_settings(), gold) != before

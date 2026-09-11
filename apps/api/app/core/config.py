@@ -119,6 +119,16 @@ class Settings(BaseSettings):
     MODEL_DEVICE: Literal["cpu", "mps", "cuda", "auto"] = "cpu"
     EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=256)
 
+    # -- rate limiting (spec 06) -------------------------------------------
+    # Per authenticated user for /v1/ask, per client IP for search.
+    # Load the models at start-up instead of on the first request. Off by
+    # default so a test or a CLI run does not pay for weights it never uses.
+    WARM_MODELS_ON_START: bool = False
+
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_ASK_PER_HOUR: int = Field(default=20, ge=1, le=10_000)
+    RATE_LIMIT_SEARCH_PER_MINUTE: int = Field(default=60, ge=1, le=10_000)
+
     # -- corpus pipeline ---------------------------------------------------
     CORPUS_ARCHIVE_DIR: Path = Path("var/corpus_archive")
     FETCH_USER_AGENT: str = (

@@ -1451,3 +1451,135 @@ headline defect — then measure once, cleanly, on the improved configuration.
   measured, not assumed.
 - After that, one clean `legaledge-kb eval-gold --fresh` run produces every
   number this stage owes.
+
+---
+
+## 2026-09-11 · Stage 9 — Hardening
+
+Branch `stage-9-hardening`. Rate limiting, HTTP caching, model warm-up, the
+device switch, and the outbound call nobody asked for. 191 tests green.
+
+### Built
+
+- **`core/ratelimit.py`** — fixed-window limiting, Redis-backed when
+  `REDIS_URL` is set and in-process otherwise. `/v1/ask` is limited per
+  *account* (20/hour), search per *client address* (60/minute), matching
+  spec §06. Corpus reads stay uncapped.
+- **`core/caching.py`** — `ETag` + `Cache-Control: public, max-age=300` on
+  every corpus read, with `If-None-Match` returning 304.
+- **Model warm-up at start-up** (`WARM_MODELS_ON_START`), off by default.
+- **`MODEL_DEVICE`** wired through both models (added in Stage 8, measured here).
+- **LiteLLM's pricing fetch disabled.**
+- `tests/unit/test_hardening.py` — 13 tests.
+
+### Decisions
+
+**A fixed window, not a sliding one.** It allows a burst of up to 2× the limit
+across a window boundary. In exchange it is two Redis commands and obviously
+correct. These limits exist to stop a runaway client spending someone's
+provider budget, not to shape traffic precisely, and a subtle limiter that
+nobody can reason about is worse than a blunt one that everybody can.
+
+**The limiter fails open.** A Redis error falls back to the in-process counter
+and logs; it never fails the request. An outage in the thing that says "no"
+must not become an outage in the thing that says "yes". There is a test for
+this specifically, because getting it backwards is easy and the failure only
+shows up when Redis is already down.
+
+**Without Redis, limits are per process** — N workers allow N× the limit. That
+is a real weakness, so it is logged as a warning at start-up rather than left
+for someone to infer from a bill.
+
+**`/v1/ask` is limited by account, not by address.** The cost being limited is
+a provider call made with that user's key; two colleagues behind one office IP
+should not share a budget, and one user on a phone and a laptop should not get
+two.
+
+**Only the leftmost `X-Forwarded-For` hop is trusted.** The header is
+client-settable, so treating the whole chain as authentic would let anyone
+forge a fresh identity per request and walk around the limit entirely.
+
+**ETags are content-derived, not timestamp-derived.** A tag built from
+`updated_at` would need every response to carry a reliable timestamp for
+everything it embeds — a section read also contains its statute and its
+cross-references — and getting that wrong serves stale law. Hashing the bytes
+about to be sent cannot be wrong about what was sent.
+
+**LiteLLM's model-pricing fetch is off.** Stage 4 observed the first completion
+pulling `model_prices_and_context_window.json` from raw.githubusercontent.com:
+an unannounced outbound call on the request path that fails in an air-gapped
+deployment and serves no purpose here, since we report the provider's own
+token counts rather than computing costs.
+
+### Measured: the reranker, CPU vs MPS
+
+The latency defect carried since Stage 4 finally got measured rather than
+estimated. 50 realistic pairs, same model, same revision:
+
+| Device | 50 pairs | Per pair | Top score |
+|---|---:|---:|---|
+| CPU (4 threads) | 20.6 s | 412 ms | 0.62764 |
+| MPS (M1 GPU) | 11.8 s | 236 ms | 0.62764 |
+
+**Speedup 1.7×; score delta 0.000001.** Two things follow.
+
+First, **I was wrong twice about this and both corrections belong here.** I
+guessed "3-8×, maybe 20-50 minutes" for MPS before measuring; the real figure
+is 1.7×. And the reason the abandoned Stage 8 run degraded to 102 s/case was
+not the work — an uncontended CPU does the same 50 pairs in 20.6 s. It was
+contention: load average 18.5 on eight cores, the eval process squeezed from
+372% to 130%. Numbers quoted from a moving average during that are forecasts,
+not measurements.
+
+Second, **the p95 < 400 ms NFR is not reachable on this architecture** and
+should stop being treated as pending. A cross-encoder must run one forward
+pass per candidate; at ~50 candidates the floor is 50 × 236 ms ≈ 11.8 s on the
+best device this machine has. Getting to 400 ms needs a different shape, not
+tuning:
+
+- cut candidates to ~10 (5× off, and costs recall — measurable against the
+  gold set, which is exactly what it is for);
+- ONNX Runtime with int8 (typically 2-4× on CPU, container-friendly);
+- a smaller cross-encoder — `bge-reranker-base`, or the
+  `nyaya-reranker-mini-v1` that ADR 0001 ruled out on aggregate recall;
+- or accept that a grounded legal answer takes seconds and drop the 400 ms
+  target, which was written before anyone had measured a 560M-parameter
+  cross-encoder on this corpus.
+
+Recommending the last one honestly, with the first as a measured experiment
+once the gold baseline exists. `MODEL_DEVICE` makes the device a setting, and
+the host `.env` now uses `mps` while the config default stays `cpu` so the
+container is unaffected.
+
+### Evidence — live
+
+```
+ETag / 304
+  GET /v1/statutes              200  etag="1d751f15…  cache-control: public, max-age=300
+                                revalidate -> 304      stale tag -> 200
+  GET /v1/statutes/dpdp-act-2023 200 etag="51b28641…  revalidate -> 304   stale -> 200
+  GET /v1/sections/390           200 etag="4d17ffce…  revalidate -> 304   stale -> 200
+
+search rate limit, 60/min per address
+  63 requests -> 60 x 200, 3 x 429
+  next -> 429 rate_limited, retry_after_seconds=44
+
+/v1/ask unauthenticated -> 401 unauthenticated
+```
+
+### Known gaps at the end of Stage 9
+
+- **p95 < 400 ms is not met and is not reachable as designed** — see above.
+  This needs a decision, not more work.
+- **No token revocation** (carried from Stage 7). Needs a store; a schema
+  decision.
+- **Rate limits are per process without Redis**, and `redis` is behind a
+  compose profile rather than being a required production service.
+- **Sentry and Langfuse remain unwired.** The settings exist from Stage 0 and
+  nothing reads them.
+- **The `.env` port mismatch is still present** (5432 vs the container's
+  5433), still at the owner's instruction to flag rather than fix.
+- Carried and unfixed: `LLM_API_KEY` empty, so generation, streamed tokens and
+  live citation validation are still unverified; `ask_logs` records nothing for
+  402/provider errors; the Part/Chapter tree is blocked on absent source data;
+  model listing on `/v1/credentials/verify` is not implemented.

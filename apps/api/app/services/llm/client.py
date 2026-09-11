@@ -37,6 +37,23 @@ class Completion:
     tokens_out: int | None
 
 
+def _configure_litellm() -> None:
+    """Stop LiteLLM reaching out to GitHub on first use.
+
+    Observed in Stage 4: the first completion fetched
+    ``model_prices_and_context_window.json`` from raw.githubusercontent.com.
+    That is an unannounced outbound call on the request path, it fails in an
+    air-gapped deployment, and nothing in this design needs it — we do not
+    compute costs, we report the provider's own token counts.
+    """
+    import litellm
+
+    litellm.suppress_debug_info = True
+    litellm.telemetry = False
+    # Use whatever pricing table shipped with the package; never refresh it.
+    litellm.model_cost_map_url = ""
+
+
 def provider_of(model: str) -> str:
     """The provider half of a LiteLLM model id (``anthropic/claude-...``)."""
     return model.split("/", 1)[0]
@@ -99,6 +116,7 @@ async def complete(
     """
     import litellm
 
+    _configure_litellm()
     key = require_api_key(settings, api_key)
     try:
         response = await litellm.acompletion(
@@ -141,6 +159,7 @@ async def stream(
     """
     import litellm
 
+    _configure_litellm()
     key = require_api_key(settings, api_key)
     chunks: list[str] = []
     usage = None
@@ -200,6 +219,7 @@ async def probe(settings: Settings, *, provider: str, api_key: str) -> None:
     """
     import litellm
 
+    _configure_litellm()
     model = PROBE_MODELS.get(provider)
     if model is None:
         raise ProviderError(f"No verification probe is defined for {provider!r}.")
