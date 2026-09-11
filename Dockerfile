@@ -43,6 +43,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
     HF_HOME=/models \
+    MODEL_CACHE_DIR=/models \
     TOKENIZERS_PARALLELISM=false
 
 # System packages per the plan: OCR (English + Hindi), PDF tooling, libpq.

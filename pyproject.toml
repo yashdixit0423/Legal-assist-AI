@@ -145,7 +145,8 @@ disallow_untyped_decorators = false
 # Third-party packages that ship no type information.
 module = [
   "structlog.*", "sse_starlette.*", "pgvector.*", "litellm.*", "asyncpg.*",
-  "sentence_transformers.*", "docling.*", "selectolax.*", "ocrmypdf.*",
+  "sentence_transformers.*", "transformers.*", "docling.*", "selectolax.*",
+  "ocrmypdf.*",
   "langfuse.*", "prometheus_fastapi_instrumentator.*", "ragas.*", "datasets.*",
 ]
 ignore_missing_imports = true

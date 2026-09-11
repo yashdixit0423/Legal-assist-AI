@@ -558,3 +558,182 @@ splitting has to handle them without exceeding 450 tokens per chunk.
   the other 42 are pinned by SHA-256, not independently re-read.
 - Registration Act and Indian Stamp Act have no independent section-count oracle
   (the dataset does not carry them), so their counts rest on India Code alone.
+
+---
+
+## 2026-09-11 · Stage 3 — Cross-links, chunking, embeddings, HNSW
+
+Branch `stage-3-index`. The corpus is now searchable: **877 chunks, all 877
+embedded, 503 cross-reference edges, HNSW built.**
+
+### Built
+
+- `services/kb/crossref.py` — deterministic regex extraction of internal
+  references ("section 23", "sub-section (2) of section 14", "sections 68 and
+  72", "s. 4", "section 53A of the Transfer of Property Act, 1882") resolved to
+  section ids. Cross-Act resolution matches an Act title exactly, then falls
+  back to the longest known title contained in the captured phrase — which is
+  what resolves "the Indian Registration Act, 1908" onto our
+  `Registration Act, 1908`.
+- `services/kb/chunk.py` — the chunker. One chunk per section where it fits;
+  otherwise split on the sub-section / proviso / Explanation / Illustration
+  boundaries `parse.segment_section()` already found, greedily re-joining
+  adjacent pieces so a section does not shatter into fifteen one-line chunks.
+  The `passage:` prefix is built here, at index time.
+- `services/kb/embedding.py` — model loading, `embed_passages`, `embed_query`.
+  The two e5 prefixes are applied in exactly one place each and nowhere else.
+- `services/kb/index.py` — the three passes (`build_links`, `build_chunks`,
+  `embed_chunks`), `index_stats`, and the HNSW drop/rebuild.
+- CLI: `link`, `chunk`, `embed`, `index` (all three in order), and `stats`
+  rewritten to report acts, sections total/in-force, chunks,
+  embedded/unembedded, largest chunk in tokens, edge count and index state.
+- `/v1/health` now reports `chunks_embedded`, `links`, `vector_index_ready` and
+  a derived `retrieval_ready`, which is false mid-bulk-embed — the moment an
+  operator most needs to be told that dense retrieval is not available.
+- `tests/unit/test_chunker.py` (14 tests) plus two smoke tests.
+
+### Decisions
+
+**Model revisions pinned.** `nyaya-embed-v1` at
+`dd24436f0f30a262f30e7457c8d5fc07b9a069c6`, `bge-reranker-v2-m3` at
+`953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, resolved from the Hub at download
+time and written into `.env` / `.env.example`. An empty revision now raises
+`ConfigError` from `Settings.require_embed_revision()` rather than resolving to
+`main`.
+
+**`MODEL_CACHE_DIR` (default `var/model_cache`) is exported as `HF_HOME`** by
+`config.py` using `os.environ.setdefault`, so the container's existing
+`HF_HOME=/models` still wins. `config.py` is the only module that writes the
+environment, for the same reason it is the only one that reads it.
+
+**Omitted sections are not chunked.** India Code keeps repealed provisions as
+items to preserve numbering; their bodies are either the word "Repealed." or
+law that no longer applies. Citing repealed law as the answer is the worst
+failure this product has. 665 of 778 sections are indexed; the other 113 stay
+in `statute_sections` so a reader can still show the gap.
+
+**The heading prefix is identical across every chunk of a section** —
+`passage: <short title> — <marginal note>. ` — and does not carry the
+sub-section label. The split text already begins with `(2)` or `Provided that`,
+so the label would be duplicated, and a prefix that varies per chunk makes the
+chunks of one section look like different provisions to the reranker.
+
+**Oversized-segment fallback** (the ambiguity flagged before the stage began,
+resolved by owner's instruction to use judgement). A sub-section that is itself
+over the ceiling — the Stamp Act's duty schedules, s.47 at 29.1k characters — is
+split at sentence boundaries (`. ; :`), and at whitespace if that is not enough.
+Nothing is dropped or truncated; a test asserts that re-joining the chunks of a
+hard-split section reproduces every word in order. Worst case is 21 chunks for
+one section.
+
+**`tsvector` is English-only, over the heading plus the body**, with the
+`passage:` marker stripped — it is an instruction to the embedding model, not a
+word anyone will search for. Hindi stays deferred: PostgreSQL 16 ships no
+`hindi` configuration.
+
+**Embeddings are L2-normalised at encode time**, so the HNSW `vector_cosine_ops`
+distance and a dot product agree.
+
+### Bugs found and fixed inside this stage
+
+1. **`nyaya-embed-v1` cannot be loaded by `SentenceTransformer(repo)`.** The
+   repository was exported with sentence-transformers **5.4.1**, whose
+   `modules.json` names `sentence_transformers.base.modules.transformer.Transformer`.
+   That package does not exist in the **3.3.1** we pin, so the load dies with
+   `ModuleNotFoundError: No module named 'sentence_transformers.base'`. Fixed by
+   assembling the three modules explicitly (Transformer → Pooling → Normalize)
+   instead of bumping a deliberately pinned dependency. The *pooling mode* is
+   still read from the repository's own `1_Pooling/config.json` rather than
+   assumed — but that file also had to be translated, because 5.x writes
+   `embedding_dimension` where 3.3.1 expects `word_embedding_dimension` and adds
+   an `include_prompt` key that 3.3.1's constructor rejects. A dimension check
+   against `EMBEDDING_DIM` now runs at load, so a future model swap that returns
+   1024 dimensions fails at load rather than at the first insert.
+2. **A test asserted the wrong behaviour.** The first version of
+   `test_a_proviso_is_never_emitted_without_its_provision_heading` required a
+   proviso to be its own chunk. It should not be: when the proviso fits beside
+   its sub-section, keeping them together is the correct reading. Split into two
+   tests — one that they stay together when they fit, one that the heading is
+   carried when they cannot.
+
+### Retrieval evidence
+
+Three hand-written queries, top 5 by cosine over the live index:
+
+*"notice period to terminate a lease"* — TPA s.113 *Waiver of notice to quit*
+(0.666), s.110 (0.574), s.106 *Duration of certain leases in absence of written
+contract* (0.573), s.111 *Determination of lease* (0.490), Contract Act s.206
+(0.459). Correct.
+
+*"when must a rent agreement be registered"* — Registration Act s.17 *Documents
+of which registration is compulsory* (0.562), s.47 (0.467), TPA s.4 (0.465),
+Registration s.48 (0.457), s.31 (0.449). Correct.
+
+*"is a non-compete after employment enforceable"* — **the right answer, Contract
+Act s.27 *Agreement in restraint of trade, void*, is at rank 22 (0.257), not in
+the top 5.** Not a chunking or prefix defect: s.27 is one chunk of 166 tokens
+with a correct prefix, and the same chunk is **rank 1 (0.596)** for "agreement
+in restraint of trade" and **rank 2** for "can an employer stop an employee
+working for a competitor after resigning". The phrase "non-compete" appears
+nowhere in an 1872 Act, and dense retrieval alone will not bridge that. It is
+**rank 1 on BM25** for "restraint of trade non compete". Recorded here rather
+than smoothed over: this is precisely the case Stage 4's hybrid + RRF + rerank
+exists to fix, and it is the query to re-run as the acceptance test for it.
+`RETRIEVAL_TOP_K=30` already covers rank 22.
+
+### Flagged, not fixed (carried forward on the owner's instruction)
+
+1. **`.env` `DATABASE_URL` and `POSTGRES_PORT` say 5432; the container binds
+   5433**, and host 5432 is a different PostgreSQL with no `legaledge` role.
+   Every host CLI and pytest run in this stage needed an explicit
+   `DATABASE_URL=...:5433/...` override. **Consequence: with a stock `.env`, the
+   database-backed tests — including the `section_no_sort` ordering suite, a
+   non-negotiable — skip silently rather than fail.**
+2. **An API image was already built** (`legaledge-api`) in a previous session,
+   against the note's "build only at Stage 4 and 9".
+3. **`statute_parts` is still empty**, so `Chapter IV` / `Part XII` references
+   cannot resolve (30 of them).
+4. The manifest is TOML, not the approved-but-unused PyYAML.
+
+### Unresolved references — recorded, not dropped
+
+218 in total, all in the `ingest_runs` row for `command='link'`:
+
+| kind | count | what it is |
+|---|---:|---|
+| `section_not_found` | 122 | mostly IPC/CrPC references made without naming the Act ("section 506"), plus state-amendment text India Code inlines into the central Act (Karnataka's "new section 19A" inside Registration Act s.19) |
+| `act_not_in_corpus` | 66 | genuine references outside our six — Indian Evidence Act 1872, Banking Regulation Act 1949, State Bank of India Act 1955 |
+| `no_part_hierarchy` | 30 | `Chapter`/`Part` references, unresolvable until `statute_parts` is populated |
+
+### Known gaps at the end of Stage 3
+
+- **`bge-reranker-v2-m3` has not been downloaded.** Its revision is pinned and
+  `require_rerank_revision()` is wired, but nothing loads it until Stage 4. It
+  may need the same explicit-module treatment as the embedder — check its
+  `modules.json` before assuming `CrossEncoder(repo)` works.
+- **No `search` verb.** Retrieval was exercised by script for the evidence
+  above; the query path proper is Stage 4 and the read API is Stage 5.
+- **The HNSW rebuild is not concurrent.** `embed_chunks` drops the index for the
+  duration of a bulk load, so dense retrieval is unavailable while it runs. That
+  is what `retrieval_ready` on `/v1/health` reports. Fine for a CLI pipeline; it
+  would not be fine for a live re-index, which nothing yet does.
+- **`section_explanations` and `statute_parts` remain empty** (Stage 8 and
+  deferred, respectively).
+
+### What Stage 4 needs
+
+- `embed_query(settings, question)` applies `query:`; do not add it at the call
+  site. `embed_passages` refuses a string without `passage:`.
+- Dense: `kb_chunks.embedding <=> :vec` with `vector_cosine_ops`. Sparse:
+  `ts_rank(kb_chunks.tsv, plainto_tsquery('english', :q))`. Both indexes exist.
+- `statute_links` is populated, so pulling a referenced section into context is
+  a join, not another retrieval.
+- The **Docker image build is due this stage**. Nothing new is needed from the
+  system packages side: torch, transformers and sentence-transformers were
+  already pinned in `pyproject.toml` from Stage 0 and no new dependency was
+  added. `MODEL_CACHE_DIR=/models` was added to the Dockerfile beside the
+  existing `HF_HOME=/models`, so the `model-cache` volume is what the container
+  reads. Expect the first container run to download the weights once.
+- The abstention gate and the citation validator are the product claim. The
+  "non-compete" query above is the acceptance test for whether hybrid retrieval
+  actually earns its place.

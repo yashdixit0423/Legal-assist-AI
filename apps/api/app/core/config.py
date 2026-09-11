@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -84,6 +85,12 @@ class Settings(BaseSettings):
     RERANK_SCORE_FLOOR: float = Field(default=0.30, ge=0.0, le=1.0)
     MAX_CHUNK_TOKENS: int = Field(default=450, ge=64, le=EMBED_MODEL_MAX_TOKENS)
 
+    # -- model weights -----------------------------------------------------
+    # A fixed host directory so the two model repositories download exactly
+    # once and are reused by every later stage and by the container.
+    MODEL_CACHE_DIR: Path = Path("var/model_cache")
+    EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=256)
+
     # -- corpus pipeline ---------------------------------------------------
     CORPUS_ARCHIVE_DIR: Path = Path("var/corpus_archive")
     FETCH_USER_AGENT: str = (
@@ -134,6 +141,33 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
 
+    def require_embed_revision(self) -> str:
+        """The pinned embedding revision, or a loud failure.
+
+        An empty revision would silently resolve to ``main``. These are small,
+        new repositories; a moved ``main`` means a corpus embedded with two
+        different models and no error anywhere.
+        """
+        return _require_revision(
+            "EMBED_MODEL_REVISION", self.EMBED_MODEL, self.EMBED_MODEL_REVISION
+        )
+
+    def require_rerank_revision(self) -> str:
+        """The pinned reranker revision, or a loud failure. See above."""
+        return _require_revision(
+            "RERANK_MODEL_REVISION", self.RERANK_MODEL, self.RERANK_MODEL_REVISION
+        )
+
+
+def _require_revision(name: str, repo: str, value: str) -> str:
+    if not value.strip():
+        msg = (
+            f"{name} is empty. Pin the exact HuggingFace revision SHA for {repo!r} "
+            "in the environment; a floating 'main' is not acceptable."
+        )
+        raise ConfigError(msg)
+    return value.strip()
+
 
 # The dotenv path get_settings() reads. Tests set this to None so a developer's
 # real .env can never satisfy a variable the test is asserting is missing.
@@ -153,9 +187,23 @@ def _format_validation_error(exc: ValidationError) -> str:
 def get_settings() -> Settings:
     """Return the process-wide settings, failing loudly on a bad environment."""
     try:
-        return Settings(_env_file=_ENV_FILE)
+        settings = Settings(_env_file=_ENV_FILE)
     except ValidationError as exc:
         raise ConfigError(_format_validation_error(exc)) from exc
+    _apply_model_cache_env(settings)
+    return settings
+
+
+def _apply_model_cache_env(settings: Settings) -> None:
+    """Point HuggingFace at MODEL_CACHE_DIR.
+
+    This is the only write to ``os.environ`` in the codebase, and it lives here
+    for the same reason the reads do: the libraries that consume ``HF_HOME``
+    read it from the process environment at import time, and we would otherwise
+    re-download several gigabytes into a developer's home directory.
+    """
+    cache = settings.MODEL_CACHE_DIR.expanduser().resolve()
+    os.environ.setdefault("HF_HOME", str(cache))
 
 
 def reset_settings_cache() -> None:

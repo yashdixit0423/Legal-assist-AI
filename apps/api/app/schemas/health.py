@@ -25,6 +25,14 @@ class CorpusHealth(BaseModel):
     statutes: int = 0
     sections: int = 0
     chunks: int = 0
+    chunks_embedded: int = 0
+    links: int = Field(default=0, description="Extracted cross-references between sections.")
+    vector_index_ready: bool = Field(
+        default=False, description="False while a bulk embed has the HNSW index dropped."
+    )
+    retrieval_ready: bool = Field(
+        default=False, description="True only when every chunk is embedded and indexed."
+    )
     last_ingest_at: datetime | None = None
 
 

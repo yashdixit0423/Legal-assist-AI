@@ -74,6 +74,10 @@ async def health(response: Response) -> HealthResponse:
             statutes=stats.statutes,
             sections=stats.sections,
             chunks=stats.chunks,
+            chunks_embedded=stats.chunks_embedded,
+            links=stats.links,
+            vector_index_ready=stats.vector_index_ready,
+            retrieval_ready=stats.retrieval_ready,
             last_ingest_at=stats.last_ingest_at,
         ),
     )

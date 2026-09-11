@@ -142,3 +142,60 @@ async def test_corpus_stats_counts_real_rows(db_session):
     await db_session.flush()
     after = await get_corpus_stats(db_session)
     assert after.statutes == before.statutes + 1
+
+
+def test_cross_reference_extractor_resolves_and_records(settings_env):
+    """One smoke test for §3.1: an internal reference resolves, a reference into
+    an Act we do not hold is recorded rather than dropped."""
+    from app.services.kb.crossref import SectionRow, extract_links
+
+    sections = {1: {"14": 101, "23": 102}}
+    titles = {"indian contract act 1872": 1}
+    links, unresolved = extract_links(
+        SectionRow(
+            id=100,
+            statute_id=1,
+            section_no="10",
+            text=(
+                "Subject to sub-section (2) of section 14 and to section 23, and to "
+                "section 111 of the Indian Evidence Act, 1872, and to Chapter IV."
+            ),
+        ),
+        sections_by_statute=sections,
+        statute_ids_by_title=titles,
+    )
+    assert sorted(link.to_section_id for link in links) == [101, 102]
+    assert {item.kind for item in unresolved} == {"act_not_in_corpus", "no_part_hierarchy"}
+
+
+def test_embedding_path_end_to_end(settings_env):
+    """One smoke test for §3.3: the model loads at its pinned revision, produces
+    768 dimensions, and puts the on-topic passage ahead of the off-topic one.
+
+    Skipped rather than failed when the weights are not in MODEL_CACHE_DIR — a
+    test must never trigger a 1.1 GB download.
+    """
+    from app.core.config import EMBEDDING_DIM, get_settings
+    from app.services.kb.embedding import embed_passages, embed_query
+
+    settings = get_settings()
+    if not (settings.MODEL_CACHE_DIR / "hub").exists():
+        pytest.skip("embedding weights not cached; run legaledge-kb embed first")
+
+    question = embed_query(settings, "when does a lease of immoveable property end")
+    passages = embed_passages(
+        settings,
+        [
+            "passage: Transfer of Property Act, 1882 — Determination of lease. "
+            "A lease of immoveable property determines by efflux of the time limited thereby.",
+            "passage: Indian Stamp Act, 1899 — Duties by whom payable. "
+            "In the absence of an agreement the expense of providing the stamp shall be borne.",
+        ],
+    )
+    assert len(question) == EMBEDDING_DIM
+    assert all(len(vector) == EMBEDDING_DIM for vector in passages)
+
+    def cosine(a: list[float], b: list[float]) -> float:
+        return sum(x * y for x, y in zip(a, b, strict=True))
+
+    assert cosine(question, passages[0]) > cosine(question, passages[1])
