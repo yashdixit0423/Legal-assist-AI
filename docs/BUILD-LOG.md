@@ -1976,3 +1976,105 @@ so a follow-up's rewrite fell back to the env key (dev) or was skipped silently
 - Focus returns to the element focused when a panel opened. Safari does not
   focus buttons on click, so there it falls back to the page.
 
+## 2026-10-07 · Chat fix phase — F3, F4 timing, test isolation (new machine)
+
+**Machine.** Windows 10 Pro 22H2, Xeon W-2125 (4 cores), 31.7 GB RAM, no GPU
+(`MODEL_DEVICE=cpu`). Native Windows, no WSL: PostgreSQL 16.13 from the EDB
+binaries with pgvector 0.8.7 built from source (MSVC), cluster in `var/pgdata`
+on :5432; Python 3.12.10, Node 22.23.2. `start.sh` runs under Git Bash and
+starts that cluster when Docker is absent (commit `fix(start): …`).
+
+**Install note.** `requirements/corpus.txt` cannot be installed beside
+`requirements/api.txt`: `docling==2.126.0` requires `docling-slim[standard]`,
+which needs `httpx>=0.28`, while `litellm==1.59.12` needs `httpx<0.28` (pinned
+0.27.2). Nothing in `apps/` or `cli/` imports docling, so every other pin was
+installed exactly and docling left out. Resolving it means changing a pin.
+
+**Corpus.** fetch → parse → index: 6 Acts, 778 sections (665 in force), 877
+chunks, all embedded, 503 cross-reference edges, HNSW ready. Index took 411 s
+on CPU, including the first model download.
+
+**F3 — mixed document + law questions.** Probe (nyaya-reranker-mini-v1,
+candidates from the full question, floor 0.60):
+
+| Question / reading | Top score | s.17 Registration Act |
+|---|---|---|
+| "My lease is for 11 months — must it be registered?" | 0.2728 | rank 1, 0.2728 |
+| · "My lease is for 11 months" | 0.5543 (TPA s.106) | rank 4, 0.0692 |
+| · "must it be registered?" | 0.7868 | rank 1, 0.7868 |
+| "My lease is for eleven months. Must it be registered, and what rent does it set?" | 0.3981 | rank 1, 0.3981 |
+| · "My lease is for eleven months." | 0.7239 (TPA s.106) | rank 5, 0.1066 |
+| · "Must it be registered" | 0.8731 (Reg. s.18) | rank 3, 0.8187 |
+| · "what rent does it set?" | 0.1522 | rank 3, 0.0661 |
+
+So the earlier diagnosis was half right: even the one-clause question misses
+the floor. The cross-encoder scores the mixed sentence as a whole far below its
+law clause. **Fix:** with documents attached only, the same candidates are also
+reranked against each clause (`question_clauses`, a deterministic split on
+sentence ends, spaced dashes and ", and what/must/…") and each candidate keeps
+its best score. Floor, `apply_floor` and the validator unchanged; without
+documents the step does not run. After: 0.2728 → **0.7868** (s.17 kept, rank 1)
+and 0.3981 → **0.8731** (s.17 kept, rank 3; TPA s.106 on lease duration also
+kept). Cost: one extra rerank of the ≤30 candidates per clause (~3 s each on
+this CPU), document questions only.
+
+**F3, second miss — found in the smoke test.** Asked as a *follow-up* (after
+"What rent and deposit does my agreement set?"), the rewrite step returned one
+fused sentence, "Does my 11-month lease agreement need to be registered?",
+which has no clauses and scores 0.1041, so the answer again cited only the
+document. The gate now also scores the clauses of the question as asked
+(`rewrite.original`): "must it be registered?" 0.8005 against the same
+candidates. In the running app the follow-up then cited Registration Act s.17
+and s.18 beside `Rental_Agreement.txt` ¶1. A single-sentence question with no
+clause break ("Does my 11-month lease need to be registered?" asked first) is
+still scored as one reading and can miss; that is the cross-encoder's
+judgement of "11 months" against "exceeding one year", not something a split
+can fix.
+
+**Gold set** (`eval-gold --fresh`, all 139 cases, run alone):
+
+| | recall@1 | @3 | @6 | @10 | MRR | abstention acc. | false abstention |
+|---|---|---|---|---|---|---|---|
+| before (`var/eval/gold-before.json`) | 84.11% | 92.52% | 94.39% | 97.20% | 0.890 | 96.88% | 8.41% |
+| after (`var/eval/gold-after.json`) | 84.11% | 92.52% | 94.39% | 97.20% | 0.890 | 96.88% | 8.41% |
+
+Identical, as expected: the gold set has no documents, so it never reaches the
+changed branch. (Abstention accuracy and false abstention differ from the
+committed `report-mini.json` — 90.6% / 3.7% — which was measured on another
+machine's corpus build; recall and MRR match it.)
+
+**F4 — 100-page PDF timing.** A 100-page text PDF (106 KB, 25 lines a page →
+200 chunks) through `POST /v1/chat/documents` on the running API: 48.1 s cold,
+38.1 s and 38.1 s warm (median **38.1 s**, CPU embedding). A 101-page PDF →
+`413 document_too_long`, "This PDF has 101 pages; the limit is 100." — the same
+message shown on the attachment chip in the Chat UI.
+
+**Test isolation.** First suite run with the conftest guard: 259 passed, no
+`UnmockedLLMCallError`; again with `HTTPS_PROXY=HTTP_PROXY=http://127.0.0.1:9`
+and `HF_HUB_OFFLINE=1`: 259 passed. After F3: 267 passed in both modes.
+
+**Smoke test** (`bash start.sh` under Git Bash; health `ok`, 778 / 877; model
+`openrouter/openai/gpt-4.1-mini` with a temporary key in `.env`). The in-app
+browser pane was hidden, so controls were driven by DOM events and read back
+as text — behaviour verified, pixel layout not. `/chat`, `/ask`, `/search`,
+`/browse` load without console errors (no frontend file changed this phase).
+Without a key: the typed "A provider key is needed" notice. With one: law
+question answered citing TPA s.107 and Registration s.17; a citation chip
+opens the source panel (verbatim s.17, "Open full page") without leaving
+`/chat`; the follow-up "what happens if such a lease is not registered?" is
+resolved from the prior turn; Regenerate replaces the answer in place; Stop
+shows "Stopped before an answer was written"; Copy shows "Copied" and copies
+plain text (checked with a stubbed clipboard — a hidden pane has no focus, so
+the real clipboard refuses); a TXT upload is answered from ¶3/¶4; the mixed
+lease question cites s.17, s.18 and ¶1; an 11 MB file → "Files can be up to
+10 MB."; a 101-page PDF → "This PDF has 101 pages; the limit is 100."; New
+chat asks first, clears the conversation and deletes the document (DELETE 204).
+The temporary account was deleted afterwards (0 users, 0 credentials).
+
+- Known: with a deleted account's token still in `localStorage`, the UI looks
+  signed in until a request returns 401. Pre-existing; not changed here.
+
+**Checks.** ruff and format clean; mypy 16 errors, all present before Chat
+(0 new — the 15 the Chat tests had added are fixed); `npm run typecheck`
+clean; build: main 385.76 kB (gzip 120.57), Chat chunk 280.42 kB (gzip 86.12).
+

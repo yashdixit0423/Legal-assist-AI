@@ -1,81 +1,40 @@
-# Handoff — Chat fix phase (stopped 2026-10-07)
+# Handoff — Chat fix phase (completed 2026-10-07)
 
-Work stopped mid-phase to move to another machine. Branch `chat-fix-wip` is
-`LegalEdge-1.1-Yash` plus one WIP commit and this file. Nothing below was
-pushed before this handoff except this branch.
+The phase was started on one machine, stopped mid-way (commit `dd1205e`), and
+finished on a second machine: Windows 10, 31.7 GB RAM, CPU only, native
+PostgreSQL 16 + pgvector 0.8.7 instead of Docker. Branch `chat-fix-wip`; not
+merged into `main`. Full measurements are in docs/BUILD-LOG.md, entry
+"Chat fix phase — F3, F4 timing, test isolation (new machine)".
 
 ## Status
 
-| Item | Status | Commit(s) | Notes |
+| Item | Status | Commit(s) | Evidence |
 |---|---|---|---|
-| F1 Lazy-load Chat | ✅ done | `8472b68` | Main bundle 664.08 kB → 385.76 kB (gzip 205.16 → 120.57); Chat chunk 280.42 kB (gzip 86.12). react-markdown/remark-gfm only in the Chat chunk. |
-| F2 Upload limit while reading | ✅ done | `afc388a` | Incremental multipart reader; aborts at 10 MB with `file_too_large`; Content-Length pre-check kept. Tests: reader stops within one 64 KB chunk with peak ≤ limit; exactly-10 MB accepted; 11 MB streamed (no length) → 413. |
-| F3 Mixed doc + law | 🔄 partial | `781e84c` (WIP tests only) | Diagnosis done, regression tests written; no code change yet; gold baseline not captured. See below. |
-| F4 PDF page cap (100) | 🔄 partial | `f0f04a5` | Cap, typed `document_too_long` (413, "This PDF has N pages; the limit is 100."), ADR 0005 amended, test for 100 vs 101 pages. **Left:** measure upload+processing time of a ~100-page text PDF; check the message in the Chat UI. |
-| F5 Cleanup | 🔄 partial | — (nothing to commit) | Done: `var/chat-test-account.json` deleted; test user `chat-test-…@example.test` deleted from the local DB (0 credentials, 1 user); every process on :8000/:8080 and the gold eval stopped. **Left:** the browser smoke test still needs a fresh temporary account, which must be deleted afterwards. |
-| Multi-worker warning | ✅ done | `fa1e6cf` | Logs `chat_documents_single_process_only` at startup when `WEB_CONCURRENCY`, `UVICORN_WORKERS` or `--workers/-w` > 1. Tests for detection and the log. |
-| Test isolation | 🔄 partial | `781e84c` | conftest forces provider key vars to `""` and stubs `litellm.acompletion/completion` to raise `UnmockedLLMCallError`; `tests/unit/test_llm_isolation.py` added. **Not yet run.** |
+| F1 Lazy-load Chat | ✅ done | `8472b68` | Re-measured: main 385.76 kB (gzip 120.57), Chat chunk 280.42 kB (gzip 86.12). |
+| F2 Upload limit while reading | ✅ done | `afc388a` | Tests pass (`test_the_reader_stops_at_the_limit_and_never_holds_more`, `test_a_file_exactly_at_the_limit_is_accepted_by_the_reader`, `test_an_11_mb_streamed_upload_without_a_length_is_refused_mid_stream`); UI shows "Files can be up to 10 MB." |
+| F3 Mixed doc + law | ✅ done | `2da33a8`, `54abbf4` | With documents only, the gate also scores each clause of the question (as rewritten and as asked) and keeps each candidate's best score. Probe: 0.2728 → 0.7868 and 0.3981 → 0.8731. Gold (139): recall@6 94.39% → 94.39%, abstention accuracy 96.88% → 96.88%. Verified in the app: cites Registration s.17, s.18 and the lease ¶1. |
+| F4 PDF page cap (100) | ✅ done | `f0f04a5` | 100-page PDF (200 chunks): 48.1 s cold, median 38.1 s warm (CPU). 101 pages → 413, and the Chat chip shows "This PDF has 101 pages; the limit is 100." |
+| F5 Cleanup | ✅ done | — | Temporary smoke-test account deleted (0 users, 0 credentials); its browser tokens cleared. |
+| Multi-worker warning | ✅ done | `fa1e6cf` | `chat_documents_single_process_only` logged with `WEB_CONCURRENCY=2`. |
+| Test isolation | ✅ done | `781e84c` | 267 passed with the guard on, and again with `HTTPS_PROXY/HTTP_PROXY=http://127.0.0.1:9` + `HF_HUB_OFFLINE=1`: 0 `UnmockedLLMCallError`. |
+| start.sh portability | ✅ done | `d1adaea` | Starts the local `var/pgdata` cluster when Docker is absent; `.venv/Scripts`; `lsof`/`open` optional. |
 
-## Partial items: what is left and the exact next step
+## Checks at the end of the phase
 
-### F3 — mixed document + law questions
-- **Done.** Read `_prepare` in `apps/api/app/services/answer/pipeline.py`. Two tests in
-  `tests/unit/test_chat_documents.py` (`test_a_mixed_question_cites_the_law_and_the_document`,
-  `test_the_statute_floor_is_unchanged_when_a_document_is_attached`) passed individually
-  on the old conftest.
-- **Findings so far.** The statute gate *already* scores the question alone:
-  `hybrid_search → rerank → apply_floor` runs on `rewrite.question` before
-  documents are considered, and document passages have their own selection and
-  budget. So a document cannot suppress statutes in code. The suspected cause of
-  the earlier miss ("My lease is for eleven months. Must it be registered, **and
-  what rent does it set?**") is the extra document-specific clause lowering the
-  cross-encoder score below `RERANK_SCORE_FLOOR`. **Not yet measured.**
-- **Planned fix.** Only when documents are attached, also score the statute gate
-  against a law-only form of the question (clause split / stripping
-  document-specific clauses, or the existing rewrite step) and take the better
-  score per candidate. `RERANK_SCORE_FLOOR` and the citation validator stay unchanged.
-  The law-only path stays untouched, so gold metrics should not move.
-- **Exact next step.**
-  1. Run the probe that was written but not run (it was in the session scratchpad;
-     recreate it): for each of "My lease is for 11 months — must it be registered?"
-     and the eleven-month/rent question, print the top reranker score for the full
-     question and for each clause. Run nothing else model-heavy at the same time.
-  2. Capture the gold baseline: `.venv/bin/legaledge-kb eval-gold --fresh --out var/eval/gold-before.json`.
-  3. Implement the law-only scoring in `_prepare` (documents path only), re-run the
-     probe (before/after scores), then `eval-gold --fresh --out var/eval/gold-after.json`.
+ruff and `ruff format --check` clean; mypy 16 errors, all present before Chat
+(0 new); pytest 267 passed; `npm run typecheck` clean; `npm run build` clean.
 
-### Test isolation
-- **Next step:** `.venv/bin/pytest -q`. Expect every existing test to pass and
-  `test_llm_isolation.py` to pass. If a test fails with `UnmockedLLMCallError`, it was
-  calling a real provider: mock `llm.complete`/`llm.stream` in it. Then run once with
-  outbound network blocked to confirm (for example, set `HTTPS_PROXY=http://127.0.0.1:9`).
+## Known issues / open decisions
 
-### F4 — timing
-- **Next step:** generate a 100-page text PDF with pymupdf, `POST /v1/chat/documents` against
-  the running API, and record the wall time in docs/BUILD-LOG.md; upload a 101-page PDF
-  in the Chat UI and confirm the chip shows the message.
-
-### Rest of the fix-phase run order (not started)
-Full `ruff/format/mypy/pytest`, frontend `typecheck/build`, `bash start.sh` in the
-background, health check, the browser smoke test (law question + panel, follow-up, TXT
-upload, mixed lease question, oversized file, 101-page PDF), leave the app running, and
-the end-of-phase report.
-
-## Gold eval baseline
-**Not captured.** A fresh run was stopped at 135 of 139 cases, so no report was
-written. For reference only, the previously committed `eval/gold/report-mini.json`:
-recall@1 84.1%, @3 92.5%, @6 94.4%, @10 97.2%; MRR 0.890; abstention accuracy 90.6%;
-false abstention 3.7% (139 cases). It was not re-measured on this code.
-
-## Known issues
-- **Tests read the real LLM key from `.env`** (pydantic-settings `env_file=".env"`) unless a
-  real environment variable overrides it. During this phase, one F3 test run with only
-  `llm.complete` mocked made **one real provider call** through `llm.stream` before it was fixed.
-  The WIP conftest guard fixes this but has not been run.
-- **The 8 GB machine swaps during the gold eval** (about 10 GB of swap in use). Running pytest or other model
-  work alongside it slowed cases from ~2 s to ~2 min. Run the eval on its own.
-- On stopping, a port sweep with `lsof -ti` also killed a Claude desktop helper process that
-  held a client connection to :8000/:8080. Use `lsof -ti -sTCP:LISTEN` next time.
-- Earlier known issues still stand (see BUILD-LOG): app-wide `--ink-3/--ink-4` contrast below
-  WCAG AA (left as decided); server-side streaming is buffered; voice transcription not
-  verified in a real browser.
+- **Dependency pins conflict:** `docling==2.126.0` (corpus extra) needs
+  `httpx>=0.28`; `litellm==1.59.12` needs `httpx<0.28`. docling is not
+  imported anywhere and was not installed here. Needs a pin decision.
+- A mixed question asked as one sentence with no clause break can still miss
+  the statute floor (the cross-encoder's reading, not the split).
+- F3 adds one rerank per clause (~3 s each on this CPU) to document questions.
+- A deleted account's stale token makes the UI look signed in until a 401.
+- Earlier known issues still stand (see BUILD-LOG): `--ink-3/--ink-4`
+  contrast, buffered streaming, voice transcription not verified in a real
+  browser.
+- The smoke test drove a hidden browser pane with DOM events: behaviour was
+  verified, pixel layout was not.
