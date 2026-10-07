@@ -126,7 +126,14 @@ export function Abstention({ state }: { state: AnswerState }) {
   );
 }
 
-export function SourceList({ state }: { state: AnswerState }) {
+export function SourceList({
+  state,
+  onOpen,
+}: {
+  state: AnswerState;
+  /** Chat opens a row beside the conversation; Ask keeps the plain link. */
+  onOpen?: (sectionId: number) => void;
+}) {
   const cited = state.sources.filter((source) =>
     state.citedIds.includes(source.section_id),
   );
@@ -144,7 +151,12 @@ export function SourceList({ state }: { state: AnswerState }) {
       </div>
       <div className="divide-y divide-[hsl(var(--line))] rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--canvas-2))]">
         {(cited.length > 0 ? cited : state.sources).map((source) => (
-          <SourceRow key={source.section_id} source={source} cited />
+          <SourceRow
+            key={source.section_id}
+            source={source}
+            cited
+            onOpen={onOpen}
+          />
         ))}
       </div>
       {cited.length > 0 && considered.length > 0 && (
@@ -158,6 +170,7 @@ export function SourceList({ state }: { state: AnswerState }) {
                 key={source.section_id}
                 source={source}
                 cited={false}
+                onOpen={onOpen}
               />
             ))}
           </div>
@@ -167,33 +180,56 @@ export function SourceList({ state }: { state: AnswerState }) {
   );
 }
 
-function SourceRow({ source, cited }: { source: SourceBlock; cited: boolean }) {
-  return (
-    <a
-      href={`/sections/${source.section_id}`}
-      className="flex items-start justify-between gap-4 px-4 py-3 transition-colors hover:bg-[hsl(var(--brand-soft))]"
-    >
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-[hsl(var(--ink))]">
-          s. {source.section_no}
-          {source.marginal_note
-            ? ` · ${source.marginal_note.replace(/\.$/, "")}`
-            : ""}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[hsl(var(--ink-3))]">
-          <span>{shortStatute(source.statute)}</span>
-          {source.origin === "cross_reference" && (
-            <span className="rounded-full border border-[hsl(var(--line))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--ink-4))]">
-              referenced by
-            </span>
-          )}
-          {!cited && (
-            <span className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--ink-4))]">
-              not cited
-            </span>
-          )}
-        </div>
+function SourceRow({
+  source,
+  cited,
+  onOpen,
+}: {
+  source: SourceBlock;
+  cited: boolean;
+  onOpen?: (sectionId: number) => void;
+}) {
+  const body = (
+    <div className="min-w-0">
+      <div className="truncate text-sm font-semibold text-[hsl(var(--ink))]">
+        s. {source.section_no}
+        {source.marginal_note
+          ? ` · ${source.marginal_note.replace(/\.$/, "")}`
+          : ""}
       </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[hsl(var(--ink-3))]">
+        <span>{shortStatute(source.statute)}</span>
+        {source.origin === "cross_reference" && (
+          <span className="rounded-full border border-[hsl(var(--line))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--ink-4))]">
+            referenced by
+          </span>
+        )}
+        {!cited && (
+          <span className="text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--ink-4))]">
+            not cited
+          </span>
+        )}
+      </div>
+    </div>
+  );
+  const className =
+    "flex items-start justify-between gap-4 px-4 py-3 transition-colors hover:bg-[hsl(var(--brand-soft))]";
+
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(source.section_id)}
+        className={`${className} w-full text-left`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <a href={`/sections/${source.section_id}`} className={className}>
+      {body}
     </a>
   );
 }

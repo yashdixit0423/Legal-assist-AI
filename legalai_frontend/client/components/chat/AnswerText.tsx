@@ -1,6 +1,7 @@
 import { CitationChip } from "@/components/CitationChip";
 import { parseAnswer } from "@/lib/api/ask";
 import type { SourceBlock } from "@/lib/api/types";
+import { useOpenSource } from "./SourcePanel";
 
 /** Answer prose with each `[S<id>]` marker rendered as the shared citation chip. */
 export function AnswerText({
@@ -10,6 +11,7 @@ export function AnswerText({
   text: string;
   sources: SourceBlock[];
 }) {
+  const openSource = useOpenSource();
   const byId = new Map(sources.map((source) => [source.section_id, source]));
   return (
     <>
@@ -21,7 +23,12 @@ export function AnswerText({
         ) : (
           <span key={index} className="mx-0.5 inline-flex gap-1">
             {part.sectionIds.map((id) => (
-              <CitationChip key={id} sectionId={id} source={byId.get(id)} />
+              <CitationChip
+                key={id}
+                sectionId={id}
+                source={byId.get(id)}
+                onOpen={openSource}
+              />
             ))}
           </span>
         ),

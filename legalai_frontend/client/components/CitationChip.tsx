@@ -15,31 +15,59 @@ export function CitationChip({
   sectionId,
   source,
   resolving = false,
+  onOpen,
 }: {
   sectionId: number;
   source?: SourceBlock;
   resolving?: boolean;
+  /**
+   * Chat opens the section beside the conversation instead of navigating away
+   * from it. Without this the chip stays the plain link Ask and Search use.
+   */
+  onOpen?: (sectionId: number) => void;
 }) {
   const label = source
     ? `${shortStatute(source.statute)} · s. ${source.section_no}`
     : `Section ${sectionId}`;
 
-  return (
-    <Link
-      to={`/sections/${sectionId}`}
-      className={cn(
-        "citation-chip group",
-        resolving && "cursor-wait opacity-70",
-      )}
-      title={source?.marginal_note ?? `Open section ${sectionId}`}
-      aria-label={`Open ${label}`}
-    >
+  const className = cn(
+    "citation-chip group",
+    resolving && "cursor-wait opacity-70",
+  );
+  const title = source?.marginal_note ?? `Open section ${sectionId}`;
+  const content = (
+    <>
       {resolving ? (
         <LoaderCircle size={12} className="animate-spin" />
       ) : (
         <Scale size={12} />
       )}
       <span>{label}</span>
+    </>
+  );
+
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(sectionId)}
+        className={className}
+        title={title}
+        aria-label={`Open ${label}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      to={`/sections/${sectionId}`}
+      className={className}
+      title={title}
+      aria-label={`Open ${label}`}
+    >
+      {content}
     </Link>
   );
 }

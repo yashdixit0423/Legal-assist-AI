@@ -9,6 +9,7 @@ import { ErrorNotice } from "@/components/ErrorNotice";
 import type { ChatMessage } from "@/hooks/use-chat";
 import { AnswerText } from "./AnswerText";
 import { MessageActions } from "./MessageActions";
+import { useOpenSource } from "./SourcePanel";
 
 /** The shared answer pieces read an `AnswerState`; a chat message maps onto one. */
 function asAnswerState(message: ChatMessage): AnswerState {
@@ -42,6 +43,7 @@ export function AssistantMessage({
   onRegenerate: () => void;
 }) {
   const navigate = useNavigate();
+  const openSource = useOpenSource();
   const state = asAnswerState(message);
   const streaming = message.status === "streaming";
   const waiting =
@@ -110,7 +112,7 @@ export function AssistantMessage({
       )}
 
       {message.sources.length > 0 && message.status === "done" && (
-        <SourceList state={state} />
+        <SourceList state={state} onOpen={openSource} />
       )}
 
       {!streaming && !message.error && (
