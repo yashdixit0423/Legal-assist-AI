@@ -40,6 +40,10 @@ SECTION_REF = re.compile(r"\bS(\d{1,12})\b")
 # invalid one.
 CITATION = re.compile(r"\[[^\[\]]*\bS(\d{1,12})\b[^\[\]]*\]")
 
+# User-document passages (docs/adr/0005): ``D<n>-p<page>`` for a PDF page,
+# ``D<n>-para<k>`` for a DOCX/TXT paragraph. Same bracket rule as sections.
+DOCUMENT_REF = re.compile(r"\bD(\d{1,2})-(p|para)(\d{1,6})\b")
+
 
 @dataclass(frozen=True)
 class CitationCheck:
@@ -50,11 +54,13 @@ class CitationCheck:
     invalid: frozenset[int]
     ok: bool
     reason: str | None = None
+    cited_documents: frozenset[str] = frozenset()
+    invalid_documents: frozenset[str] = frozenset()
 
     @property
     def violation(self) -> bool:
         """True when the answer cited something that was not in the prompt."""
-        return bool(self.invalid)
+        return bool(self.invalid or self.invalid_documents)
 
 
 def extract_citations(answer: str) -> frozenset[int]:
@@ -75,8 +81,21 @@ def extract_citations(answer: str) -> frozenset[int]:
     return frozenset(cited)
 
 
+def extract_document_citations(answer: str) -> frozenset[str]:
+    """Every document passage id the answer cites, normalised to ``D1-p4``."""
+    cited: set[str] = set()
+    for group in BRACKETED.finditer(answer):
+        cited.update(
+            f"D{int(ref.group(1))}-{ref.group(2)}{int(ref.group(3))}"
+            for ref in DOCUMENT_REF.finditer(group.group(1))
+        )
+    return frozenset(cited)
+
+
 def validate_citations(
-    answer: str, allowed_section_ids: frozenset[int] | set[int]
+    answer: str,
+    allowed_section_ids: frozenset[int] | set[int],
+    allowed_document_ids: frozenset[str] | None = None,
 ) -> CitationCheck:
     """Check an answer's citations against the sections actually packed.
 
@@ -89,6 +108,15 @@ def validate_citations(
     allowed = frozenset(allowed_section_ids)
     cited = extract_citations(answer)
     invalid = cited - allowed
+    # ``None`` means no documents were in play (Ask, or Chat without
+    # attachments): document ids are then not looked for at all, exactly as
+    # before documents existed. An empty set means "documents were in play and
+    # none may be cited", which is a different rule.
+    docs_cited: frozenset[str] = frozenset()
+    docs_invalid: frozenset[str] = frozenset()
+    if allowed_document_ids is not None:
+        docs_cited = extract_document_citations(answer)
+        docs_invalid = docs_cited - allowed_document_ids
     if invalid:
         return CitationCheck(
             cited=cited,
@@ -96,9 +124,34 @@ def validate_citations(
             invalid=invalid,
             ok=False,
             reason="cited_sections_not_in_context",
+            cited_documents=docs_cited,
+            invalid_documents=docs_invalid,
         )
-    if not cited:
+    if docs_invalid:
         return CitationCheck(
-            cited=cited, allowed=allowed, invalid=invalid, ok=False, reason="no_citations"
+            cited=cited,
+            allowed=allowed,
+            invalid=invalid,
+            ok=False,
+            reason="cited_documents_not_in_context",
+            cited_documents=docs_cited,
+            invalid_documents=docs_invalid,
         )
-    return CitationCheck(cited=cited, allowed=allowed, invalid=invalid, ok=True)
+    if not cited and not docs_cited:
+        return CitationCheck(
+            cited=cited,
+            allowed=allowed,
+            invalid=invalid,
+            ok=False,
+            reason="no_citations",
+            cited_documents=docs_cited,
+            invalid_documents=docs_invalid,
+        )
+    return CitationCheck(
+        cited=cited,
+        allowed=allowed,
+        invalid=invalid,
+        ok=True,
+        cited_documents=docs_cited,
+        invalid_documents=docs_invalid,
+    )

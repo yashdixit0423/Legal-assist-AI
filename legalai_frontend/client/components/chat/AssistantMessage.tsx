@@ -1,4 +1,4 @@
-import { RefreshCw, Search, Square } from "lucide-react";
+import { FileText, RefreshCw, Search, Square } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Abstention,
@@ -7,9 +7,12 @@ import {
 } from "@/components/AnswerPanel";
 import { ErrorNotice } from "@/components/ErrorNotice";
 import type { ChatMessage } from "@/hooks/use-chat";
+import type { DocumentSourceBlock } from "@/lib/api/types";
+import { displayName } from "@/lib/chat/files";
+import { locatorLabel } from "@/lib/chat/citations";
 import { AnswerText } from "./AnswerText";
 import { MessageActions } from "./MessageActions";
-import { useOpenSource } from "./SourcePanel";
+import { useOpenDocument, useOpenSource } from "./SourcePanel";
 
 /** The shared answer pieces read an `AnswerState`; a chat message maps onto one. */
 function asAnswerState(message: ChatMessage): AnswerState {
@@ -90,7 +93,11 @@ export function AssistantMessage({
 
       {(message.text || (streaming && message.phase === "writing")) && (
         <div>
-          <AnswerText text={message.text} sources={message.sources} />
+          <AnswerText
+            text={message.text}
+            sources={message.sources}
+            documentSources={message.documentSources}
+          />
           {streaming && <span className="stream-caret" aria-hidden="true" />}
         </div>
       )}
@@ -111,8 +118,21 @@ export function AssistantMessage({
         />
       )}
 
+      {message.status === "done" &&
+        (message.documentSources?.length ?? 0) > 0 && (
+          <DocumentSources
+            sources={message.documentSources ?? []}
+            cited={message.citedDocumentIds ?? []}
+          />
+        )}
+
       {message.sources.length > 0 && message.status === "done" && (
-        <SourceList state={state} onOpen={openSource} />
+        <div>
+          {(message.documentSources?.length ?? 0) > 0 && (
+            <div className="meta-label -mb-1 mt-5">Legal sources</div>
+          )}
+          <SourceList state={state} onOpen={openSource} />
+        </div>
       )}
 
       {!streaming && !message.error && (
@@ -128,6 +148,63 @@ export function AssistantMessage({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Passages of the user's own documents, listed apart from the law and labelled
+ * as theirs. Cited passages first; the rest are what the model was also given.
+ */
+function DocumentSources({
+  sources,
+  cited,
+}: {
+  sources: DocumentSourceBlock[];
+  cited: string[];
+}) {
+  const openDocument = useOpenDocument();
+  const ordered = [
+    ...sources.filter((s) => cited.includes(s.citation_id)),
+    ...sources.filter((s) => !cited.includes(s.citation_id)),
+  ];
+  return (
+    <div className="mt-5 border-t border-[hsl(var(--line))] pt-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="meta-label">Document sources</div>
+        <span className="text-[11px] text-[hsl(var(--ink-4))]">
+          {cited.length} cited · {sources.length} provided
+        </span>
+      </div>
+      <div className="divide-y divide-[hsl(var(--line))] rounded-xl border border-[hsl(var(--line))] bg-[hsl(var(--canvas-2))]">
+        {ordered.map((source) => (
+          <button
+            key={source.citation_id}
+            type="button"
+            onClick={() => openDocument?.(source)}
+            className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-[hsl(var(--brand-soft))]"
+          >
+            <FileText
+              size={14}
+              className="mt-0.5 shrink-0 text-[hsl(var(--ink-3))]"
+            />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-[hsl(var(--ink))]">
+                {displayName(source.filename, 40)} ·{" "}
+                {locatorLabel(source.locator_kind, source.locator)}
+              </div>
+              <div className="mt-1 line-clamp-2 text-xs text-[hsl(var(--ink-3))]">
+                {source.excerpt}
+              </div>
+              {!cited.includes(source.citation_id) && (
+                <span className="mt-1 inline-block text-[10px] uppercase tracking-[0.08em] text-[hsl(var(--ink-4))]">
+                  not cited
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

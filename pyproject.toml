@@ -54,16 +54,20 @@ dependencies = [
   "sentry-sdk==2.69.1",
   "prometheus-fastapi-instrumentator==7.1.0",
   "structlog==24.4.0",
+  # Chat documents (docs/adr/0005): in-memory text extraction on the request
+  # path. pymupdf moved here from the corpus extra; lxml with it, because
+  # python-docx needs it at runtime.
+  "pymupdf==1.24.14",
+  "python-docx==1.1.2",
+  "lxml==5.3.2",
 ]
 
 [project.optional-dependencies]
 # Corpus pipeline only. Deliberately NOT installed into the API image:
 # docling + ocrmypdf + datasets add ~1.5 GB that the request path never touches.
 corpus = [
-  "lxml==5.3.2",
   "selectolax==0.3.34",
   "docling==2.126.0",
-  "pymupdf==1.24.14",
   "ocrmypdf==16.13.0",
   "datasets==3.6.0",
 ]
@@ -146,7 +150,7 @@ disallow_untyped_decorators = false
 module = [
   "structlog.*", "sse_starlette.*", "pgvector.*", "litellm.*", "asyncpg.*",
   "sentence_transformers.*", "transformers.*", "docling.*", "selectolax.*",
-  "ocrmypdf.*",
+  "ocrmypdf.*", "fitz.*", "pymupdf.*", "docx.*",
   "langfuse.*", "prometheus_fastapi_instrumentator.*", "ragas.*", "datasets.*",
 ]
 ignore_missing_imports = true

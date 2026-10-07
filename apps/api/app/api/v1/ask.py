@@ -23,10 +23,11 @@ from app.core.errors import LegalEdgeError
 from app.core.logging import get_logger
 from app.db.models import User
 from app.db.session import get_sessionmaker
-from app.schemas.ask import AskRequest, AskResponse, SourceBlock
+from app.schemas.ask import AskRequest, AskResponse, DocumentSourceBlock, SourceBlock
 from app.services.answer import pipeline
 from app.services.answer.pipeline import AskResult
 from app.services.auth import accounts
+from app.services.documents.store import StoredDocument, get_store
 from app.services.llm import client as llm
 
 router = APIRouter(tags=["ask"])
@@ -48,6 +49,23 @@ def _sources(result: AskResult) -> list[SourceBlock]:
             cited=block.section_id in cited,
         )
         for block in result.blocks
+    ]
+
+
+def _document_sources(result: AskResult) -> list[DocumentSourceBlock]:
+    cited = set(result.cited_document_ids)
+    return [
+        DocumentSourceBlock(
+            citation_id=block.citation_id,
+            document_id=block.document_id,
+            filename=block.filename,
+            locator_kind=block.locator_kind,
+            locator=block.locator,
+            excerpt=block.excerpt,
+            rerank_score=block.score,
+            cited=block.citation_id in cited,
+        )
+        for block in result.document_blocks
     ]
 
 
@@ -103,10 +121,13 @@ async def ask(
             limit=settings.RATE_LIMIT_ASK_PER_HOUR,
             window_seconds=3600,
         )
+    # Resolved before any stream opens, so a foreign or expired id is a plain
+    # 404 rather than an error event mid-stream (docs/adr/0005).
+    documents = get_store().get_many(str(user.id), payload.document_ids)
     api_key = await _resolve_key(settings, user)
     if "text/event-stream" in accept.lower():
         return EventSourceResponse(
-            _event_stream(payload, request, settings, api_key),
+            _event_stream(payload, request, settings, api_key, documents),
             ping=15,
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
@@ -121,6 +142,7 @@ async def ask(
             turns=_turns(payload),
             statute_slug=payload.statute_slug,
             api_key=api_key,
+            documents=documents,
         )
     await _log(result)
     return AskResponse(
@@ -140,6 +162,8 @@ async def ask(
         latency_ms=result.latency_ms,
         turns_used=bool(result.rewritten_question),
         rewritten_question=result.rewritten_question,
+        document_sources=_document_sources(result),
+        cited_document_ids=result.cited_document_ids,
     )
 
 
@@ -162,7 +186,11 @@ async def _resolve_key(settings: Settings, user: User) -> str | None:
 
 
 async def _event_stream(
-    payload: AskRequest, request: Request, settings: Settings, api_key: str | None
+    payload: AskRequest,
+    request: Request,
+    settings: Settings,
+    api_key: str | None,
+    documents: list[StoredDocument],
 ) -> AsyncIterator[dict[str, str]]:
     """Adapt pipeline events onto the SSE wire format.
 
@@ -179,6 +207,7 @@ async def _event_stream(
                 turns=_turns(payload),
                 statute_slug=payload.statute_slug,
                 api_key=api_key,
+                documents=documents,
             ):
                 if await request.is_disconnected():
                     logger.info("ask_stream_client_gone")

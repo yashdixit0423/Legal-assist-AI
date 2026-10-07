@@ -3,8 +3,10 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CitationChip } from "@/components/CitationChip";
 import { parseAnswer } from "@/lib/api/ask";
-import type { SourceBlock } from "@/lib/api/types";
-import { useOpenSource } from "./SourcePanel";
+import type { DocumentSourceBlock, SourceBlock } from "@/lib/api/types";
+import { parseDocumentRefs } from "@/lib/chat/citations";
+import { DocumentCitationChip } from "./DocumentCitationChip";
+import { useOpenDocument, useOpenSource } from "./SourcePanel";
 
 type Cite = (children: ReactNode) => ReactNode;
 
@@ -19,20 +21,44 @@ type Cite = (children: ReactNode) => ReactNode;
 export function AnswerText({
   text,
   sources,
+  documentSources = [],
 }: {
   text: string;
   sources: SourceBlock[];
+  /** Chat with attachments: `[D1-p4]` markers resolve against these. */
+  documentSources?: DocumentSourceBlock[];
 }) {
   const openSource = useOpenSource();
+  const openDocument = useOpenDocument();
 
   // Rebuilt only when the sources change, not on every streamed token, so
   // the rendered tree is updated in place rather than remounted.
   const rendered = useMemo(() => {
     const byId = new Map(sources.map((source) => [source.section_id, source]));
-    const chips = (value: string, key: string | number): ReactNode[] =>
-      parseAnswer(value).map((part, index) =>
+    const byCitation = new Map(
+      documentSources.map((source) => [source.citation_id, source]),
+    );
+    const documentChips = (value: string, key: string): ReactNode[] =>
+      parseDocumentRefs(value).map((part, index) =>
         part.kind === "text" ? (
           part.value
+        ) : (
+          <span key={`${key}-d${index}`} className="mx-0.5 inline-flex gap-1">
+            {part.citationIds.map((id) => (
+              <DocumentCitationChip
+                key={id}
+                citationId={id}
+                source={byCitation.get(id)}
+                onOpen={openDocument}
+              />
+            ))}
+          </span>
+        ),
+      );
+    const chips = (value: string, key: string | number): ReactNode[] =>
+      parseAnswer(value).flatMap((part, index) =>
+        part.kind === "text" ? (
+          documentChips(part.value, `${key}-${index}`)
         ) : (
           <span key={`${key}-${index}`} className="mx-0.5 inline-flex gap-1">
             {part.sectionIds.map((id) => (
@@ -51,7 +77,7 @@ export function AnswerText({
         typeof child === "string" ? chips(child, index) : child,
       );
     return components(cite);
-  }, [sources, openSource]);
+  }, [sources, documentSources, openSource, openDocument]);
 
   return (
     <div className="chat-answer">

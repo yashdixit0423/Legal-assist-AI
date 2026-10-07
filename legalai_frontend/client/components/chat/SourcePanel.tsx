@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
+import { ArrowUpRight, FileText, LoaderCircle, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SectionReader } from "@/components/SectionReader";
 import {
@@ -15,6 +15,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { getSection } from "@/lib/api/corpus";
+import type { DocumentSourceBlock } from "@/lib/api/types";
+import { locatorLabel } from "@/lib/chat/citations";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +28,18 @@ export const SourceOpenContext = createContext<
 >(undefined);
 
 export const useOpenSource = () => useContext(SourceOpenContext);
+
+/** Same idea for a passage of the user's own document. */
+export const DocumentOpenContext = createContext<
+  ((source: DocumentSourceBlock) => void) | undefined
+>(undefined);
+
+export const useOpenDocument = () => useContext(DocumentOpenContext);
+
+/** What the panel is showing: a statute section, or a document passage. */
+export type SourceTarget =
+  | { kind: "section"; sectionId: number }
+  | { kind: "document"; source: DocumentSourceBlock };
 
 export type PanelMode = "split" | "sheet" | "drawer";
 
@@ -58,12 +72,39 @@ export function usePanelMode(): PanelMode {
  * the authority, and it should look more prominent than the explanation.
  */
 export function SourcePanel({
+  target,
+  onClose,
+  className,
+}: {
+  target: SourceTarget;
+  /** Omitted inside the sheet, which brings its own close button. */
+  onClose?: () => void;
+  className?: string;
+}) {
+  if (target.kind === "document") {
+    return (
+      <DocumentPassage
+        source={target.source}
+        onClose={onClose}
+        className={className}
+      />
+    );
+  }
+  return (
+    <SectionSource
+      sectionId={target.sectionId}
+      onClose={onClose}
+      className={className}
+    />
+  );
+}
+
+function SectionSource({
   sectionId,
   onClose,
   className,
 }: {
   sectionId: number;
-  /** Omitted inside the sheet, which brings its own close button. */
   onClose?: () => void;
   className?: string;
 }) {
@@ -132,19 +173,91 @@ export function SourcePanel({
   );
 }
 
+/**
+ * A passage from the user's own document. Labelled as theirs, set apart from
+ * the statute text, and never presented as law.
+ */
+function DocumentPassage({
+  source,
+  onClose,
+  className,
+}: {
+  source: DocumentSourceBlock;
+  onClose?: () => void;
+  className?: string;
+}) {
+  const heading = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [source.citation_id]);
+
+  return (
+    <section
+      aria-label="Source"
+      className={cn("flex h-full min-h-0 flex-col", className)}
+    >
+      <div
+        ref={heading}
+        tabIndex={-1}
+        className={cn(
+          "flex items-center justify-between gap-3 border-b border-[hsl(var(--line))] px-5 py-3 outline-none",
+          !onClose && "pr-12",
+        )}
+      >
+        <span className="meta-label">Your document</span>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-button h-8 w-8"
+            aria-label="Close source"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+        <div className="flex items-start gap-3">
+          <span className="feature-icon shrink-0">
+            <FileText size={16} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-display break-words text-[22px] leading-tight tracking-[-0.01em] text-[hsl(var(--ink))]">
+              {source.filename}
+            </h2>
+            <p className="mt-1 text-[12px] text-[hsl(var(--ink-3))]">
+              {source.locator_kind === "page" ? "Page" : "Paragraph"}{" "}
+              {source.locator} · cited as{" "}
+              {locatorLabel(source.locator_kind, source.locator)}
+            </p>
+          </div>
+        </div>
+        <blockquote className="mt-5 whitespace-pre-wrap border-l-2 border-[hsl(var(--line-strong))] pl-4 font-serif text-[15px] leading-[1.75] text-[hsl(var(--ink-2))]">
+          {source.excerpt}
+        </blockquote>
+        <p className="mt-4 text-[11.5px] leading-relaxed text-[hsl(var(--ink-4))]">
+          An excerpt of the passage the answer drew on, from the file you
+          attached. It is not law. Documents are processed temporarily and not
+          stored.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /** The sheet (tablet) and drawer (phone) forms of the same panel. */
 export function SourceOverlay({
   mode,
-  sectionId,
+  target,
   onClose,
   returnFocus,
 }: {
   mode: Exclude<PanelMode, "split">;
-  sectionId: number | null;
+  target: SourceTarget | null;
   onClose: () => void;
   returnFocus: () => void;
 }) {
-  const open = sectionId !== null;
+  const open = target !== null;
   const onOpenChange = (next: boolean) => {
     if (!next) onClose();
   };
@@ -161,11 +274,11 @@ export function SourceOverlay({
           className="flex w-full flex-col gap-0 border-[hsl(var(--line))] bg-[hsl(var(--canvas))] p-0 sm:max-w-[560px]"
           onCloseAutoFocus={onCloseAutoFocus}
         >
-          <SheetTitle className="sr-only">Source section</SheetTitle>
+          <SheetTitle className="sr-only">Source</SheetTitle>
           <SheetDescription className="sr-only">
-            The verbatim text of the cited section.
+            The text the cited passage came from.
           </SheetDescription>
-          {sectionId !== null && <SourcePanel sectionId={sectionId} />}
+          {target !== null && <SourcePanel target={target} />}
         </SheetContent>
       </Sheet>
     );
@@ -177,13 +290,13 @@ export function SourceOverlay({
         className="max-h-[85dvh] border-[hsl(var(--line))] bg-[hsl(var(--canvas))]"
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <DrawerTitle className="sr-only">Source section</DrawerTitle>
+        <DrawerTitle className="sr-only">Source</DrawerTitle>
         <DrawerDescription className="sr-only">
-          The verbatim text of the cited section.
+          The text the cited passage came from.
         </DrawerDescription>
-        {sectionId !== null && (
+        {target !== null && (
           <SourcePanel
-            sectionId={sectionId}
+            target={target}
             onClose={onClose}
             className="min-h-[50dvh]"
           />

@@ -37,7 +37,12 @@ export type ApiErrorCode =
   | "retrieval_failed"
   | "citation_validation_failed"
   | "configuration_error"
-  | "internal_error";
+  | "internal_error"
+  // Chat documents (docs/adr/0005)
+  | "unsupported_file_type"
+  | "file_too_large"
+  | "document_unreadable"
+  | "document_not_found";
 
 // --- auth ------------------------------------------------------------------
 
@@ -172,9 +177,13 @@ export interface AskRequest {
   /** Client-held history, max 6. The server stores nothing. */
   turns?: Turn[];
   statute_slug?: string | null;
+  /** Chat only: the caller's own uploaded documents, at most 3. */
+  document_ids?: string[];
 }
 
 export interface SourceBlock {
+  /** Absent from older servers; "statute" for every corpus block. */
+  kind?: "statute";
   /** The id the answer cites, e.g. "S1046". */
   citation_id: string;
   section_id: number;
@@ -187,6 +196,30 @@ export interface SourceBlock {
   rerank_score: number | null;
   /** True when the answer actually cited this block. */
   cited: boolean;
+}
+
+/** One passage of the caller's own document that was placed in the prompt (Chat). */
+export interface DocumentSourceBlock {
+  kind: "document";
+  /** The id the answer cites, e.g. "D1-p4" or "D2-para12". */
+  citation_id: string;
+  document_id: string;
+  filename: string;
+  locator_kind: "page" | "para";
+  locator: number;
+  /** A short excerpt of the passage, returned only to its owner. */
+  excerpt: string;
+  rerank_score: number | null;
+}
+
+/** Metadata for an uploaded document. There is deliberately no text field. */
+export interface DocumentResponse {
+  document_id: string;
+  filename: string;
+  kind: "pdf" | "txt" | "docx";
+  pages: number | null;
+  chunk_count: number;
+  expires_at: string;
 }
 
 export interface AskResponse {
@@ -287,6 +320,8 @@ export interface AskDonePayload {
   tokens_in: number | null;
   tokens_out: number | null;
   latency_ms: number;
+  /** Chat with documents: the document passages the answer cited. */
+  cited_document_ids?: string[];
 }
 
 export interface RateLimit {

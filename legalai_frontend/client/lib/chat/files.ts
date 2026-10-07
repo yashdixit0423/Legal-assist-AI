@@ -8,9 +8,13 @@
 
 export type DocumentKind = "pdf" | "txt" | "docx";
 
-/** Documents are off until the backend that reads them ships (Phase 6). */
+/**
+ * On by default now that /v1/chat/documents exists; `VITE_CHAT_DOCUMENTS=false`
+ * is the kill switch (e.g. an API running more than one worker, whose
+ * in-memory document store would not be shared — docs/adr/0005).
+ */
 export const DOCUMENTS_ENABLED =
-  (import.meta.env.VITE_CHAT_DOCUMENTS as string | undefined) === "true";
+  (import.meta.env.VITE_CHAT_DOCUMENTS as string | undefined) !== "false";
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_FILES = 3;

@@ -8,7 +8,7 @@ stored.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -35,11 +35,18 @@ class AskRequest(BaseModel):
     statute_slug: str | None = Field(
         default=None, max_length=120, description="Restrict retrieval to one Act."
     )
+    document_ids: list[Annotated[str, Field(min_length=8, max_length=64)]] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Chat only: the caller's own documents from POST /v1/chat/documents "
+        "(docs/adr/0005). An unknown, expired or foreign id is a 404.",
+    )
 
 
 class SourceBlock(BaseModel):
     """One section that was placed in the prompt."""
 
+    kind: Literal["statute"] = "statute"
     citation_id: str = Field(description="The id the answer cites, e.g. 'S1046'.")
     section_id: int
     statute: str
@@ -49,6 +56,20 @@ class SourceBlock(BaseModel):
     origin: Literal["retrieved", "cross_reference"]
     rerank_score: float | None = None
     cited: bool = Field(description="True when the answer actually cited this block.")
+
+
+class DocumentSourceBlock(BaseModel):
+    """One passage of the caller's own document that was placed in the prompt."""
+
+    kind: Literal["document"] = "document"
+    citation_id: str = Field(description="The id the answer cites, e.g. 'D1-p4'.")
+    document_id: str
+    filename: str
+    locator_kind: Literal["page", "para"]
+    locator: int
+    excerpt: str = Field(description="A short excerpt, returned only to the document's owner.")
+    rerank_score: float | None = None
+    cited: bool
 
 
 class AskResponse(BaseModel):
@@ -84,3 +105,7 @@ class AskResponse(BaseModel):
     rewritten_question: str | None = Field(
         default=None, description="The standalone question retrieval ran against, if rewritten."
     )
+    document_sources: list[DocumentSourceBlock] = Field(
+        default_factory=list, description="Chat only: document passages placed in the prompt."
+    )
+    cited_document_ids: list[str] = Field(default_factory=list)

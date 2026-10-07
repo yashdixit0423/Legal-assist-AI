@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askStream } from "@/lib/api/ask";
 import { ApiError } from "@/lib/api/client";
-import type { AskDonePayload, SourceBlock, Turn } from "@/lib/api/types";
+import { deleteDocument, uploadDocument } from "@/lib/api/documents";
+import type {
+  AskDonePayload,
+  DocumentSourceBlock,
+  SourceBlock,
+  Turn,
+} from "@/lib/api/types";
 import { MAX_FILES, checkFile, type DocumentKind } from "@/lib/chat/files";
 
 /**
@@ -60,6 +66,9 @@ export interface ChatMessage {
   done?: AskDonePayload;
   /** On a user message: the documents in play when it was sent. */
   attachments?: ChatAttachment[];
+  /** On an answer: passages of the user's documents that were in the prompt. */
+  documentSources?: DocumentSourceBlock[];
+  citedDocumentIds?: string[];
 }
 
 let counter = 0;
@@ -104,6 +113,9 @@ function buildTurns(messages: ChatMessage[], uptoIndex: number): Turn[] {
   return turns.slice(-MAX_TURNS);
 }
 
+const documentIdsOf = (attachments: ChatAttachment[]) =>
+  attachments.flatMap((a) => (a.documentId ? [a.documentId] : []));
+
 function placeholder(): ChatMessage {
   return {
     id: nextId(),
@@ -136,9 +148,30 @@ export function useChat() {
     [],
   );
 
+  /** The server no longer holds these documents; say so on their chips. */
+  const expire = useCallback((documentIds: string[]) => {
+    setAttachments((list) =>
+      list.map((a) =>
+        a.documentId && documentIds.includes(a.documentId)
+          ? {
+              ...a,
+              status: "error",
+              documentId: undefined,
+              error: "Expired. Remove it and attach it again.",
+            }
+          : a,
+      ),
+    );
+  }, []);
+
   /** Stream an answer into the assistant message `id`. */
   const run = useCallback(
-    async (id: string, question: string, turns: Turn[]) => {
+    async (
+      id: string,
+      question: string,
+      turns: Turn[],
+      documentIds: string[] = [],
+    ) => {
       abort.current?.abort();
       const controller = new AbortController();
       abort.current = controller;
@@ -147,10 +180,25 @@ export function useChat() {
       let finished = false;
       try {
         await askStream(
-          { question, turns },
+          documentIds.length
+            ? { question, turns, document_ids: documentIds }
+            : { question, turns },
           {
-            onSources: (sources) =>
-              patch(id, () => ({ sources, phase: "preparing" })),
+            onSources: (all) => {
+              // One event carries both kinds; statute blocks keep every field
+              // Ask relies on, document passages are told apart by `kind`.
+              const isDocument = (s: { kind?: string }) =>
+                s.kind === "document";
+              const sources = all.filter((s) => !isDocument(s));
+              const documentSources = (all as unknown[]).filter((s) =>
+                isDocument(s as { kind?: string }),
+              ) as DocumentSourceBlock[];
+              patch(id, () => ({
+                sources,
+                documentSources,
+                phase: "preparing",
+              }));
+            },
             onToken: (chunk, replacesAll) => {
               accumulated = replacesAll ? chunk : accumulated + chunk;
               patch(id, () => ({
@@ -182,6 +230,7 @@ export function useChat() {
               finished = true;
               patch(id, () => ({
                 citedIds: done.cited_section_ids,
+                citedDocumentIds: done.cited_document_ids ?? [],
                 done,
                 status: "done",
                 phase: undefined,
@@ -189,6 +238,7 @@ export function useChat() {
             },
             onError: (error) => {
               finished = true;
+              if (error.code === "document_not_found") expire(documentIds);
               patch(id, () => ({
                 error,
                 status: "error",
@@ -231,7 +281,7 @@ export function useChat() {
         if (abort.current === controller) abort.current = null;
       }
     },
-    [patch],
+    [patch, expire],
   );
 
   const send = useCallback(
@@ -253,7 +303,7 @@ export function useChat() {
       const answer = placeholder();
       const turns = buildTurns(current, current.length);
       setMessages([...current, user, answer]);
-      void run(answer.id, question, turns);
+      void run(answer.id, question, turns, documentIdsOf(ready));
     },
     [run],
   );
@@ -268,58 +318,123 @@ export function useChat() {
       if (current.some((m) => m.status === "streaming")) return;
       const answer = { ...placeholder(), id };
       setMessages(current.map((m) => (m.id === id ? answer : m)));
-      void run(id, question.text, buildTurns(current, index - 1));
+      void run(
+        id,
+        question.text,
+        buildTurns(current, index - 1),
+        documentIdsOf(question.attachments ?? []),
+      );
     },
     [run],
   );
 
   const stop = useCallback(() => abort.current?.abort(), []);
 
+  const patchAttachment = useCallback(
+    (id: string, change: Partial<ChatAttachment>) =>
+      setAttachments((list) =>
+        list.map((a) => (a.id === id ? { ...a, ...change } : a)),
+      ),
+    [],
+  );
+
   /**
-   * Validate and add files. A rejected file still shows as a chip with the
+   * Validate, then upload each file straight away so it is ready by the time
+   * the question is sent. A rejected file still shows as a chip with the
    * reason, so the user sees why rather than nothing happening.
    */
-  const attach = useCallback(async (files: File[]) => {
-    const room =
-      MAX_FILES -
-      attachmentsRef.current.filter((a) => a.status !== "error").length;
-    for (const [index, file] of files.entries()) {
-      const id = nextId();
-      const base = { id, name: file.name, size: file.size, file, progress: 0 };
-      if (index >= room) {
+  const attach = useCallback(
+    async (files: File[]) => {
+      let room =
+        MAX_FILES -
+        attachmentsRef.current.filter((a) => a.status !== "error").length;
+      for (const file of files) {
+        const id = nextId();
+        const base = {
+          id,
+          name: file.name,
+          size: file.size,
+          file,
+          progress: 0,
+        };
+        if (room <= 0) {
+          setAttachments((list) => [
+            ...list,
+            {
+              ...base,
+              kind: "txt",
+              status: "error",
+              error: `Up to ${MAX_FILES} documents per conversation.`,
+            },
+          ]);
+          continue;
+        }
+        const check = await checkFile(file);
+        if ("reason" in check) {
+          setAttachments((list) => [
+            ...list,
+            { ...base, kind: "txt", status: "error", error: check.reason },
+          ]);
+          continue;
+        }
+        room -= 1;
         setAttachments((list) => [
           ...list,
-          {
-            ...base,
-            kind: "txt",
-            status: "error",
-            error: `Up to ${MAX_FILES} documents per conversation.`,
-          },
+          { ...base, kind: check.kind, status: "uploading" },
         ]);
-        continue;
+        uploadDocument(file, (progress) => patchAttachment(id, { progress }))
+          .then((document) => {
+            // Removed while it was uploading: forget it on the server too.
+            if (!attachmentsRef.current.some((a) => a.id === id)) {
+              deleteDocument(document.document_id);
+              return;
+            }
+            patchAttachment(id, {
+              status: "ready",
+              progress: 100,
+              documentId: document.document_id,
+              pages: document.pages,
+            });
+          })
+          .catch((caught: unknown) =>
+            patchAttachment(id, {
+              status: "error",
+              error:
+                caught instanceof ApiError
+                  ? caught.message
+                  : "Couldn't upload that file. Check your connection and try again.",
+            }),
+          );
       }
-      const check = await checkFile(file);
-      if ("reason" in check) {
-        setAttachments((list) => [
-          ...list,
-          { ...base, kind: "txt", status: "error", error: check.reason },
-        ]);
-        continue;
-      }
-      setAttachments((list) => [
-        ...list,
-        { ...base, kind: check.kind, status: "ready", progress: 100 },
-      ]);
-    }
-  }, []);
+    },
+    [patchAttachment],
+  );
 
   const detach = useCallback((id: string) => {
+    const attachment = attachmentsRef.current.find((a) => a.id === id);
+    if (attachment?.documentId) deleteDocument(attachment.documentId);
     setAttachments((list) => list.filter((a) => a.id !== id));
+  }, []);
+
+  // Closing the tab forgets every document now rather than at its expiry.
+  useEffect(() => {
+    const forget = () =>
+      attachmentsRef.current.forEach(
+        (a) => a.documentId && deleteDocument(a.documentId, true),
+      );
+    window.addEventListener("pagehide", forget);
+    return () => {
+      window.removeEventListener("pagehide", forget);
+      forget(); // leaving the Chat page within the app
+    };
   }, []);
 
   const reset = useCallback(() => {
     abort.current?.abort();
     abort.current = null;
+    attachmentsRef.current.forEach(
+      (a) => a.documentId && deleteDocument(a.documentId),
+    );
     setMessages([]);
     setAttachments([]);
   }, []);
@@ -327,6 +442,7 @@ export function useChat() {
   return {
     messages,
     streaming: messages.some((m) => m.status === "streaming"),
+    uploading: attachments.some((a) => a.status === "uploading"),
     send,
     regenerate,
     stop,

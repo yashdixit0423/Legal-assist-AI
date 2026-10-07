@@ -21,6 +21,7 @@ safety property.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -33,7 +34,13 @@ from app.core.errors import LegalEdgeError
 from app.core.logging import get_logger
 from app.db.models import AskLog
 from app.services.answer.abstain import ABSTENTION_MESSAGE, GateResult, apply_floor
-from app.services.answer.citations import CITATION, CitationCheck, validate_citations
+from app.services.answer.citations import (
+    BRACKETED,
+    CITATION,
+    DOCUMENT_REF,
+    CitationCheck,
+    validate_citations,
+)
 from app.services.answer.pack import (
     ContextBlock,
     expand_to_sections,
@@ -41,8 +48,17 @@ from app.services.answer.pack import (
     packed_section_ids,
     render_context,
 )
-from app.services.answer.prompt import PROMPT_VERSION, build_messages, build_retry_messages
+from app.services.answer.prompt import (
+    DOCUMENT_PROMPT_VERSION,
+    PROMPT_VERSION,
+    build_document_messages,
+    build_document_retry_messages,
+    build_messages,
+    build_retry_messages,
+)
 from app.services.answer.rewrite import Rewrite, rewrite_question
+from app.services.documents.retrieve import DocumentBlock, render_documents, select_blocks
+from app.services.documents.store import StoredDocument
 from app.services.llm import client as llm
 from app.services.retrieval.hybrid import hybrid_search
 from app.services.retrieval.rerank import rerank
@@ -80,6 +96,10 @@ class AskResult:
     latency_ms: int = 0
     question: str = ""
     rewritten_question: str | None = None
+    # Chat documents (docs/adr/0005). Empty for Ask and document-free Chat.
+    document_blocks: list[DocumentBlock] = field(default_factory=list)
+    cited_document_ids: list[str] = field(default_factory=list)
+    documents_used: int = 0
 
     @property
     def retrieved_section_ids(self) -> list[int]:
@@ -96,10 +116,30 @@ class Prepared:
     context: str = ""
     allowed: frozenset[int] = frozenset()
     abstain_reason: str | None = None
+    document_blocks: list[DocumentBlock] = field(default_factory=list)
+    documents_used: int = 0
 
     @property
     def ready(self) -> bool:
-        return self.gate.passed and bool(self.allowed)
+        return (self.gate.passed and bool(self.allowed)) or bool(self.document_blocks)
+
+    @property
+    def allowed_documents(self) -> frozenset[str] | None:
+        """``None`` when no documents are in play — the validator then ignores D ids."""
+        if not self.documents_used:
+            return None
+        return frozenset(block.citation_id for block in self.document_blocks)
+
+    @property
+    def prompt_version(self) -> str:
+        return DOCUMENT_PROMPT_VERSION if self.documents_used else PROMPT_VERSION
+
+    def messages(self) -> list[dict[str, str]]:
+        if not self.documents_used:
+            return build_messages(self.rewrite.question, self.context)
+        return build_document_messages(
+            self.rewrite.question, self.context, render_documents(self.document_blocks)
+        )
 
 
 async def _prepare(
@@ -110,22 +150,44 @@ async def _prepare(
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
     api_key: str | None = None,
+    documents: list[StoredDocument] | None = None,
 ) -> Prepared:
-    """Rewrite, retrieve, rerank, gate, expand and pack. No model call to answer."""
+    """Rewrite, retrieve, rerank, gate, expand and pack. No model call to answer.
+
+    With documents attached (docs/adr/0005), their passages are packed too and
+    the request is ready even when no statute clears the floor: "summarise
+    this" cannot be scored against the corpus. The citation validator is still
+    the guarantee — the answer must cite something it was given.
+    """
     rewrite = await rewrite_question(settings, question, turns or [], api_key=api_key)
     candidates = await hybrid_search(session, settings, rewrite.question, statute_slug=statute_slug)
     ranked = rerank(settings, rewrite.question, candidates)
     gate = apply_floor(ranked, floor=settings.RERANK_SCORE_FLOOR, top_n=settings.RERANK_TOP_N)
+
+    document_blocks: list[DocumentBlock] = []
+    if documents:
+        document_blocks = await asyncio.to_thread(
+            select_blocks, settings, rewrite.question, documents
+        )
+    documents_used = len(documents or [])
+
     if not gate.passed:
-        logger.info("abstained", reason=gate.reason, top_score=gate.top_score)
-        return Prepared(gate=gate, rewrite=rewrite, abstain_reason=gate.reason)
+        if not document_blocks:
+            logger.info("abstained", reason=gate.reason, top_score=gate.top_score)
+            return Prepared(gate=gate, rewrite=rewrite, abstain_reason=gate.reason)
+        return Prepared(
+            gate=gate,
+            rewrite=rewrite,
+            document_blocks=document_blocks,
+            documents_used=documents_used,
+        )
 
     blocks = pack(
         await expand_to_sections(session, gate.kept),
         budget_tokens=settings.CONTEXT_BUDGET_TOKENS,
     )
     allowed = packed_section_ids(blocks)
-    if not allowed:
+    if not allowed and not document_blocks:
         # Cannot happen with a sane budget, but a prompt with no blocks would
         # be asking the model to answer from memory.
         logger.error("packing_produced_no_blocks", kept=len(gate.kept))
@@ -137,6 +199,8 @@ async def _prepare(
         blocks=blocks,
         context=render_context(blocks),
         allowed=allowed,
+        document_blocks=document_blocks,
+        documents_used=documents_used,
     )
 
 
@@ -151,6 +215,8 @@ def _abstention(prepared: Prepared, *, started: float, reason: str | None = None
         question=prepared.rewrite.original,
         rewritten_question=prepared.rewrite.question if prepared.rewrite.changed else None,
         latency_ms=int((time.perf_counter() - started) * 1000),
+        prompt_version=prepared.prompt_version,
+        documents_used=prepared.documents_used,
     )
 
 
@@ -165,18 +231,25 @@ async def answer_question(
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
     api_key: str | None = None,
+    documents: list[StoredDocument] | None = None,
 ) -> AskResult:
     """Answer one question, or abstain honestly."""
     started = time.perf_counter()
     prepared = await _prepare(
-        session, settings, question, turns=turns, statute_slug=statute_slug, api_key=api_key
+        session,
+        settings,
+        question,
+        turns=turns,
+        statute_slug=statute_slug,
+        api_key=api_key,
+        documents=documents,
     )
     if not prepared.ready:
         return _abstention(prepared, started=started)
 
-    messages = build_messages(prepared.rewrite.question, prepared.context)
+    messages = prepared.messages()
     completion = await llm.complete(settings, messages, api_key=api_key)
-    check = validate_citations(completion.text, prepared.allowed)
+    check = validate_citations(completion.text, prepared.allowed, prepared.allowed_documents)
 
     violation = check.violation
     if not check.ok:
@@ -184,7 +257,7 @@ async def answer_question(
         completion = await llm.complete(
             settings, _retry_messages(prepared, completion.text, check), api_key=api_key
         )
-        check = validate_citations(completion.text, prepared.allowed)
+        check = validate_citations(completion.text, prepared.allowed, prepared.allowed_documents)
         if not check.ok:
             logger.error("citation_check_failed_twice", reason=check.reason)
             result = _abstention(prepared, started=started, reason=f"citation_{check.reason}")
@@ -209,27 +282,51 @@ async def answer_question(
         question=prepared.rewrite.original,
         rewritten_question=prepared.rewrite.question if prepared.rewrite.changed else None,
         latency_ms=int((time.perf_counter() - started) * 1000),
+        **_document_fields(prepared, check),
     )
+
+
+def _document_fields(prepared: Prepared, check: CitationCheck) -> dict[str, Any]:
+    return {
+        "prompt_version": prepared.prompt_version,
+        "document_blocks": prepared.document_blocks,
+        "cited_document_ids": sorted(check.cited_documents),
+        "documents_used": prepared.documents_used,
+    }
 
 
 def _retry_messages(
     prepared: Prepared, previous: str, check: CitationCheck
 ) -> list[dict[str, str]]:
-    return build_retry_messages(
+    invalid = [f"S{sid}" for sid in sorted(check.invalid)] + sorted(check.invalid_documents)
+    if not prepared.documents_used:
+        return build_retry_messages(
+            prepared.rewrite.question,
+            prepared.context,
+            previous,
+            invalid=invalid or ["nothing at all"],
+            allowed=[block.citation_id for block in prepared.blocks],
+        )
+    return build_document_retry_messages(
         prepared.rewrite.question,
         prepared.context,
+        render_documents(prepared.document_blocks),
         previous,
-        invalid=[f"S{sid}" for sid in sorted(check.invalid)] or ["nothing at all"],
-        allowed=[block.citation_id for block in prepared.blocks],
+        invalid=invalid or ["nothing at all"],
+        allowed=[block.citation_id for block in prepared.blocks]
+        + [block.citation_id for block in prepared.document_blocks],
     )
 
 
 # --- streaming path ---------------------------------------------------------
 
 
-def _sources_payload(result_blocks: list[ContextBlock]) -> list[dict[str, Any]]:
-    return [
+def _sources_payload(
+    result_blocks: list[ContextBlock], document_blocks: list[DocumentBlock] | None = None
+) -> list[dict[str, Any]]:
+    statutes = [
         {
+            "kind": "statute",
             "citation_id": block.citation_id,
             "section_id": block.section_id,
             "statute": block.statute_short_title,
@@ -241,6 +338,22 @@ def _sources_payload(result_blocks: list[ContextBlock]) -> list[dict[str, Any]]:
         }
         for block in result_blocks
     ]
+    # Document passages go back only to their owner, with a short excerpt so a
+    # citation can be checked. Never the whole text, never logged.
+    documents = [
+        {
+            "kind": "document",
+            "citation_id": block.citation_id,
+            "document_id": block.document_id,
+            "filename": block.filename,
+            "locator_kind": block.locator_kind,
+            "locator": block.locator,
+            "excerpt": block.excerpt,
+            "rerank_score": block.score,
+        }
+        for block in document_blocks or []
+    ]
+    return statutes + documents
 
 
 async def stream_answer(
@@ -251,6 +364,7 @@ async def stream_answer(
     turns: list[dict[str, str]] | None = None,
     statute_slug: str | None = None,
     api_key: str | None = None,
+    documents: list[StoredDocument] | None = None,
 ) -> AsyncIterator[tuple[Event, AskResult | None]]:
     """Yield SSE events, and on the final ``done`` the result for logging.
 
@@ -265,7 +379,13 @@ async def stream_answer(
     """
     started = time.perf_counter()
     prepared = await _prepare(
-        session, settings, question, turns=turns, statute_slug=statute_slug, api_key=api_key
+        session,
+        settings,
+        question,
+        turns=turns,
+        statute_slug=statute_slug,
+        api_key=api_key,
+        documents=documents,
     )
 
     if prepared.rewrite.changed:
@@ -287,9 +407,12 @@ async def stream_answer(
         yield Event("done", _done_payload(result)), result
         return
 
-    yield Event("sources", {"sources": _sources_payload(prepared.blocks)}), None
+    yield (
+        Event("sources", {"sources": _sources_payload(prepared.blocks, prepared.document_blocks)}),
+        None,
+    )
 
-    messages = build_messages(prepared.rewrite.question, prepared.context)
+    messages = prepared.messages()
     try:
         streamed = await _stream_attempt(settings, messages, prepared, api_key=api_key)
     except LegalEdgeError as exc:
@@ -322,7 +445,7 @@ async def stream_answer(
         except LegalEdgeError as exc:
             yield Event("error", {"code": exc.code, "message": exc.message}), None
             return
-        check = validate_citations(completion.text, prepared.allowed)
+        check = validate_citations(completion.text, prepared.allowed, prepared.allowed_documents)
         if not check.ok:
             logger.error("citation_check_failed_twice", reason=check.reason)
             result = _abstention(prepared, started=started, reason=f"citation_{check.reason}")
@@ -351,6 +474,7 @@ async def stream_answer(
         question=prepared.rewrite.original,
         rewritten_question=prepared.rewrite.question if prepared.rewrite.changed else None,
         latency_ms=int((time.perf_counter() - started) * 1000),
+        **_document_fields(prepared, check),
     )
     for section_id in result.cited_section_ids:
         yield Event("citation", {"citation_id": f"S{section_id}", "section_id": section_id}), None
@@ -388,7 +512,7 @@ async def _stream_attempt(
             completion = part
             break
         buffer += part
-        if _has_invalid_citation(buffer, prepared.allowed):
+        if _has_invalid_citation(buffer, prepared.allowed, prepared.allowed_documents):
             violated = True
             logger.warning("citation_violation_mid_stream", chars=len(buffer))
             break
@@ -403,14 +527,24 @@ async def _stream_attempt(
         events=events,
         text=text,
         completion=completion,
-        check=validate_citations(text, prepared.allowed),
+        check=validate_citations(text, prepared.allowed, prepared.allowed_documents),
         violated=False,
     )
 
 
-def _has_invalid_citation(buffer: str, allowed: frozenset[int]) -> bool:
-    """True as soon as a complete ``[S<id>]`` in the buffer is not permitted."""
-    return any(int(match.group(1)) not in allowed for match in CITATION.finditer(buffer))
+def _has_invalid_citation(
+    buffer: str, allowed: frozenset[int], allowed_documents: frozenset[str] | None = None
+) -> bool:
+    """True as soon as a complete ``[S<id>]`` (or ``[D<n>-…]``) is not permitted."""
+    if any(int(match.group(1)) not in allowed for match in CITATION.finditer(buffer)):
+        return True
+    if allowed_documents is None:
+        return False
+    return any(
+        f"D{int(ref.group(1))}-{ref.group(2)}{int(ref.group(3))}" not in allowed_documents
+        for group in BRACKETED.finditer(buffer)
+        for ref in DOCUMENT_REF.finditer(group.group(1))
+    )
 
 
 def _done_payload(result: AskResult) -> dict[str, Any]:
@@ -424,6 +558,7 @@ def _done_payload(result: AskResult) -> dict[str, Any]:
         "tokens_in": result.tokens_in,
         "tokens_out": result.tokens_out,
         "latency_ms": result.latency_ms,
+        "cited_document_ids": result.cited_document_ids,
     }
 
 
@@ -452,6 +587,8 @@ async def write_ask_log(session: AsyncSession, result: AskResult) -> None:
             tokens_in=result.tokens_in,
             tokens_out=result.tokens_out,
             latency_ms=result.latency_ms,
+            # A count only. Document text is never logged (docs/adr/0005).
+            documents_used=result.documents_used,
         )
     )
     await session.commit()

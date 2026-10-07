@@ -39,6 +39,8 @@ export const ChatComposer = forwardRef<
     trailing?: React.ReactNode;
     /** Above the textarea: attachment chips. */
     header?: React.ReactNode;
+    /** Holds Send without disabling typing, e.g. while a document uploads. */
+    sendBlocked?: boolean;
   }
 >(function ChatComposer(
   {
@@ -52,6 +54,7 @@ export const ChatComposer = forwardRef<
     leading,
     trailing,
     header,
+    sendBlocked = false,
   },
   ref,
 ) {
@@ -68,7 +71,8 @@ export const ChatComposer = forwardRef<
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
   }, [value]);
 
-  const canSend = value.trim().length >= 3 && !streaming && !disabled;
+  const canSend =
+    value.trim().length >= 3 && !streaming && !disabled && !sendBlocked;
 
   return (
     <div

@@ -109,6 +109,9 @@ class AskLog(Base):
     tokens_in: Mapped[int | None] = mapped_column(Integer)
     tokens_out: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    # How many user documents were attached (docs/adr/0005). A count, never
+    # their text: no column here can hold a document.
+    documents_used: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

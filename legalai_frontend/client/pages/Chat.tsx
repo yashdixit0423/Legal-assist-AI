@@ -13,10 +13,12 @@ import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { NewChatDialog } from "@/components/chat/NewChatDialog";
 import {
+  DocumentOpenContext,
   SourceOpenContext,
   SourceOverlay,
   SourcePanel,
   usePanelMode,
+  type SourceTarget,
 } from "@/components/chat/SourcePanel";
 import { LegalAssistLayout } from "@/components/LegalAssistLayout";
 import {
@@ -26,6 +28,7 @@ import {
 } from "@/components/ui/resizable";
 import { useAuth, useRateLimit } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
+import type { DocumentSourceBlock } from "@/lib/api/types";
 import { DOCUMENTS_ENABLED, MAX_FILES } from "@/lib/chat/files";
 
 /**
@@ -41,14 +44,15 @@ export default function Chat() {
   const [draft, setDraft] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const composer = useRef<ChatComposerHandle>(null);
-  const [sourceId, setSourceId] = useState<number | null>(null);
+  const [target, setTarget] = useState<SourceTarget | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const mode = usePanelMode();
 
   const exhausted = rateLimit !== null && rateLimit.remaining <= 0;
 
   const send = () => {
-    if (draft.trim().length < 3 || chat.streaming) return;
+    // A document still being read would silently miss this question.
+    if (draft.trim().length < 3 || chat.streaming || chat.uploading) return;
     chat.send(draft);
     setDraft("");
   };
@@ -60,12 +64,20 @@ export default function Chat() {
 
   // A citation opens its section beside the conversation, never instead of it:
   // navigating away would discard the in-memory conversation.
-  const openSource = useCallback((sectionId: number) => {
+  const show = useCallback((next: SourceTarget) => {
     if (document.activeElement instanceof HTMLElement) {
       opener.current = document.activeElement;
     }
-    setSourceId(sectionId);
+    setTarget(next);
   }, []);
+  const openSource = useCallback(
+    (sectionId: number) => show({ kind: "section", sectionId }),
+    [show],
+  );
+  const openDocument = useCallback(
+    (source: DocumentSourceBlock) => show({ kind: "document", source }),
+    [show],
+  );
 
   const returnFocus = useCallback(() => {
     const target = opener.current;
@@ -74,19 +86,19 @@ export default function Chat() {
   }, []);
 
   const closeSource = useCallback(() => {
-    setSourceId(null);
+    setTarget(null);
     if (mode === "split") requestAnimationFrame(returnFocus);
   }, [mode, returnFocus]);
 
   // The split panel has no dialog to catch Escape, so the page does.
   useEffect(() => {
-    if (mode !== "split" || sourceId === null) return;
+    if (mode !== "split" || target === null) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !event.defaultPrevented) closeSource();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [mode, sourceId, closeSource]);
+  }, [mode, target, closeSource]);
 
   const startOver = () => {
     if (chat.messages.length === 0) return;
@@ -117,6 +129,7 @@ export default function Chat() {
           onSend={send}
           onStop={chat.stop}
           streaming={chat.streaming}
+          sendBlocked={chat.uploading}
           disabled={!signedIn || exhausted}
           leading={
             DOCUMENTS_ENABLED && signedIn ? (
@@ -182,49 +195,53 @@ export default function Chat() {
   return (
     <LegalAssistLayout variant="app">
       <SourceOpenContext.Provider value={openSource}>
-        {mode === "split" ? (
-          <ResizablePanelGroup
-            direction="horizontal"
-            autoSaveId="legaledge.chat.split"
-            className="min-h-0 flex-1"
-          >
-            <ResizablePanel
-              id="conversation"
-              order={1}
-              defaultSize={60}
-              minSize={40}
+        <DocumentOpenContext.Provider value={openDocument}>
+          {mode === "split" ? (
+            <ResizablePanelGroup
+              direction="horizontal"
+              autoSaveId="legaledge.chat.split"
+              className="min-h-0 flex-1"
             >
-              <div className="flex h-full min-h-0 flex-col">{conversation}</div>
-            </ResizablePanel>
-            {sourceId !== null && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel
-                  id="source"
-                  order={2}
-                  defaultSize={40}
-                  minSize={25}
-                >
-                  <SourcePanel
-                    sectionId={sourceId}
-                    onClose={closeSource}
-                    className="bg-[hsl(var(--canvas-2)/.5)]"
-                  />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        ) : (
-          <>
-            {conversation}
-            <SourceOverlay
-              mode={mode}
-              sectionId={sourceId}
-              onClose={() => setSourceId(null)}
-              returnFocus={returnFocus}
-            />
-          </>
-        )}
+              <ResizablePanel
+                id="conversation"
+                order={1}
+                defaultSize={60}
+                minSize={40}
+              >
+                <div className="flex h-full min-h-0 flex-col">
+                  {conversation}
+                </div>
+              </ResizablePanel>
+              {target !== null && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel
+                    id="source"
+                    order={2}
+                    defaultSize={40}
+                    minSize={25}
+                  >
+                    <SourcePanel
+                      target={target}
+                      onClose={closeSource}
+                      className="bg-[hsl(var(--canvas-2)/.5)]"
+                    />
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          ) : (
+            <>
+              {conversation}
+              <SourceOverlay
+                mode={mode}
+                target={target}
+                onClose={() => setTarget(null)}
+                returnFocus={returnFocus}
+              />
+            </>
+          )}
+        </DocumentOpenContext.Provider>
       </SourceOpenContext.Provider>
 
       <NewChatDialog
@@ -233,7 +250,7 @@ export default function Chat() {
         onConfirm={() => {
           chat.reset();
           setDraft("");
-          setSourceId(null);
+          setTarget(null);
         }}
         onClosed={() => composer.current?.focus()}
       />
