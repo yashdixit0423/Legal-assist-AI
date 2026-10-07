@@ -62,6 +62,51 @@ TEST_ENV = {
 for key, value in TEST_ENV.items():
     os.environ.setdefault(key, value)
 
+# Provider keys are *forced* empty, not defaulted: the developer's .env holds a
+# real LLM_API_KEY, and a real environment variable — even an empty one —
+# outranks the .env file. A test must never spend money or reach a provider.
+PROVIDER_KEY_VARS = (
+    "LLM_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GROQ_API_KEY",
+    "OPENROUTER_API_KEY",
+    "MISTRAL_API_KEY",
+    "COHERE_API_KEY",
+    "AZURE_API_KEY",
+)
+for key in PROVIDER_KEY_VARS:
+    os.environ[key] = ""
+
+
+class UnmockedLLMCallError(AssertionError):
+    """Raised by the provider layer during tests. Mock ``llm.complete``/``llm.stream``."""
+
+
+async def _refuse_llm_call(*_args: object, **_kwargs: object) -> None:
+    raise UnmockedLLMCallError(
+        "A test reached litellm: the provider call was not mocked. Patch "
+        "app.services.llm.client.complete / .stream (or the module's `llm`) instead."
+    )
+
+
+@pytest.fixture(autouse=True)
+def _no_real_llm(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Every test: provider keys empty, and any real provider call fails loudly."""
+    import litellm
+
+    from app.core.config import reset_settings_cache
+
+    for key in PROVIDER_KEY_VARS:
+        monkeypatch.setenv(key, "")
+    monkeypatch.setattr(litellm, "acompletion", _refuse_llm_call)
+    monkeypatch.setattr(litellm, "completion", _refuse_llm_call)
+    reset_settings_cache()
+    yield
+    reset_settings_cache()
+
 
 @pytest.fixture
 def settings_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[pytest.MonkeyPatch]:

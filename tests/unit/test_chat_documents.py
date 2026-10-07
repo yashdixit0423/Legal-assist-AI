@@ -683,3 +683,140 @@ def test_more_than_one_worker_logs_a_warning(monkeypatch):
     assert event == "chat_documents_single_process_only"
     assert fields["workers"] == 2
     assert "document_not_found" in fields["detail"]
+
+
+# --- mixed document + law questions (fix F3) --------------------------------
+
+LEASE = DocumentBlock(
+    citation_id="D1-para2",
+    document_id="doc-lease000",
+    filename="Rental_Agreement.txt",
+    locator_kind="para",
+    locator=2,
+    text="1. Term. The lease is for a period of eleven months commencing 1 November 2026.",
+)
+
+
+def _registration_s17(score: float):
+    from app.services.answer.pack import ContextBlock
+    from app.services.retrieval.hybrid import Candidate
+    from app.services.retrieval.rerank import Scored
+
+    candidate = Candidate(
+        chunk_id=1,
+        section_id=18,
+        statute_id=4,
+        statute_short_title="Registration Act, 1908",
+        statute_slug="registration-act-1908",
+        section_no="17",
+        marginal_note="Documents of which registration is compulsory",
+        heading_prefix="passage: Registration Act, 1908 — Documents of which registration "
+        "is compulsory. ",
+        text="(d) leases of immovable property from year to year, or for any term "
+        "exceeding one year",
+    )
+    block = ContextBlock(
+        section_id=18,
+        statute_short_title="Registration Act, 1908",
+        statute_slug="registration-act-1908",
+        section_no="17",
+        section_no_sort="00017",
+        marginal_note="Documents of which registration is compulsory",
+        text=candidate.text,
+        origin="retrieved",
+        rerank_score=score,
+    )
+    return Scored(candidate=candidate, score=score), block
+
+
+def _mixed_pipeline(monkeypatch, *, statute_score: float, answer: str, seen: list):
+    from app.services.answer import pipeline
+    from app.services.llm.client import Completion
+
+    scored, block = _registration_s17(statute_score)
+
+    async def search(*_args, **_kwargs):
+        return [scored.candidate]
+
+    async def expand(_session, kept):
+        return [block] if kept else []
+
+    async def model(_settings, messages, **_kwargs):
+        seen.append(messages)
+        return Completion(text=answer, model="m", tokens_in=1, tokens_out=1)
+
+    monkeypatch.setattr(pipeline, "hybrid_search", search)
+    monkeypatch.setattr(pipeline, "rerank", _returning([scored]))
+    monkeypatch.setattr(pipeline, "expand_to_sections", expand)
+    monkeypatch.setattr(pipeline, "select_blocks", _returning([LEASE]))
+
+    async def stream(_settings, messages, **_kwargs):
+        seen.append(messages)
+        for word in answer.split(" "):
+            yield word + " "
+        yield Completion(text=answer, model="m", tokens_in=1, tokens_out=1)
+
+    monkeypatch.setattr(pipeline.llm, "complete", model)
+    monkeypatch.setattr(pipeline.llm, "stream", stream)
+    return pipeline
+
+
+async def test_a_mixed_question_cites_the_law_and_the_document(monkeypatch, settings_env):
+    """s.17 clears the floor on its own: it must reach the prompt beside the lease."""
+    from app.core.config import get_settings
+
+    seen: list = []
+    pipeline = _mixed_pipeline(
+        monkeypatch,
+        statute_score=0.93,
+        answer=(
+            "Your lease runs for eleven months [D1-para2]. Section 17 makes registration "
+            "compulsory only for leases from year to year or exceeding one year [S18], "
+            "so this one need not be registered."
+        ),
+        seen=seen,
+    )
+    events = [
+        event
+        async for event, _ in pipeline.stream_answer(
+            None,
+            get_settings(),
+            "My lease is for 11 months — must it be registered?",
+            documents=[_doc(doc_id="doc-lease000")],
+        )
+    ]
+    sources = next(e for e in events if e.name == "sources").data["sources"]
+    assert {s["kind"] for s in sources} == {"statute", "document"}
+    assert any(s["kind"] == "statute" and s["section_no"] == "17" for s in sources)
+    done = next(e for e in events if e.name == "done").data
+    assert done["answered"]
+    assert done["cited_section_ids"] == [18]
+    assert done["cited_document_ids"] == ["D1-para2"]
+    user_turn = seen[0][1]["content"]
+    assert user_turn.index('<block id="S18">') < user_turn.index('<document id="D1-para2"')
+
+
+async def test_the_statute_floor_is_unchanged_when_a_document_is_attached(
+    monkeypatch, settings_env
+):
+    """Below the floor, s.17 stays out — a document never lowers the bar for law."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    seen: list = []
+    pipeline = _mixed_pipeline(
+        monkeypatch,
+        statute_score=settings.RERANK_SCORE_FLOOR - 0.01,
+        answer="Your lease runs for eleven months [D1-para2].",
+        seen=seen,
+    )
+    result = await pipeline.answer_question(
+        None,
+        settings,
+        "My lease is for 11 months — must it be registered?",
+        documents=[_doc(doc_id="doc-lease000")],
+    )
+    assert result.answered
+    assert result.blocks == []  # no statute block packed
+    assert '<block id="S18">' not in seen[0][1]["content"]
+    assert result.cited_document_ids == ["D1-para2"]
