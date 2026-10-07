@@ -30,7 +30,8 @@ for questions asked in Chat. Specifically:
    cap and parsed in memory; it is never spooled to a temporary file. The type
    is decided from the bytes (`%PDF-`, a ZIP containing `word/document.xml`, or
    valid UTF-8 without NUL bytes), never from the client's `Content-Type` or the
-   filename. PDFs are capped at 300 pages; extracted text at 400,000 characters.
+   filename. PDFs are capped at 100 pages (`document_too_long`, amended 2026-10-07 from
+   300 after measuring processing time); extracted text at 400,000 characters.
    A PDF with no extractable text (a scan) is refused as `document_unreadable`;
    OCR is out of scope.
 2. **Chunking and embedding.** Text is chunked with the corpus chunker's limits
@@ -81,6 +82,6 @@ for questions asked in Chat. Specifically:
 - The upload path holds up to ~10 MB per request in memory plus extracted text
   and vectors per stored document; the per-user and global caps bound this.
 - Embedding a document is CPU work on the request path; it runs off the event
-  loop. A 300-page PDF can take tens of seconds on the development host.
+  loop. The 100-page cap bounds it; see BUILD-LOG for the measured time.
 - Scanned PDFs, OCR, a document viewer, document generation, and keeping a
   document past its TTL remain out of scope.

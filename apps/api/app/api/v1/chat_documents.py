@@ -168,7 +168,10 @@ async def _read_file_part(request: Request) -> tuple[str | None, bytes]:
         }
     },
     responses={
-        413: {"description": "Over 10 MB, over 300 pages, or too much text (file_too_large)."},
+        413: {
+            "description": "Over 10 MB or too much text (file_too_large), or a PDF over "
+            "100 pages (document_too_long)."
+        },
         415: {"description": "Not a PDF, DOCX or UTF-8 text file (unsupported_file_type)."},
         422: {"description": "No readable text, e.g. a scanned PDF (document_unreadable)."},
     },

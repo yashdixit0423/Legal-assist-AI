@@ -42,6 +42,7 @@ export type ApiErrorCode =
   | "unsupported_file_type"
   | "file_too_large"
   | "document_unreadable"
+  | "document_too_long"
   | "document_not_found";
 
 // --- auth ------------------------------------------------------------------

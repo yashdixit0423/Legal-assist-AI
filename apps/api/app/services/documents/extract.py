@@ -28,7 +28,7 @@ DocumentKind = Literal["pdf", "txt", "docx"]
 LocatorKind = Literal["page", "para"]
 
 MAX_BYTES = 10 * 1024 * 1024
-MAX_PDF_PAGES = 300
+MAX_PDF_PAGES = 100
 MAX_TEXT_CHARS = 400_000
 # A DOCX is a ZIP. These bound what python-docx is allowed to inflate, so a
 # 10 MB upload cannot expand into gigabytes of XML (a zip bomb).
@@ -49,6 +49,12 @@ class FileTooLargeError(LegalEdgeError):
     code = "file_too_large"
     http_status = 413
     message = "Documents can be up to 10 MB."
+
+
+class DocumentTooLongError(LegalEdgeError):
+    code = "document_too_long"
+    http_status = 413
+    message = f"PDFs can be up to {MAX_PDF_PAGES} pages."
 
 
 class DocumentUnreadableError(LegalEdgeError):
@@ -147,7 +153,10 @@ def _extract_pdf(data: bytes) -> Extracted:
         if document.needs_pass:
             raise DocumentUnreadableError("That PDF is password-protected.")
         if document.page_count > MAX_PDF_PAGES:
-            raise FileTooLargeError(f"PDFs can be up to {MAX_PDF_PAGES} pages.")
+            raise DocumentTooLongError(
+                f"This PDF has {document.page_count} pages; the limit is {MAX_PDF_PAGES}.",
+                details={"pages": int(document.page_count), "max_pages": MAX_PDF_PAGES},
+            )
         segments = []
         for index in range(document.page_count):
             text = _clean(document.load_page(index).get_text("text"))
