@@ -89,7 +89,7 @@ export function AssistantMessage({
       )}
 
       {(message.text || (streaming && message.phase === "writing")) && (
-        <div className="text-[15px] leading-[1.75] text-[hsl(var(--ink))]">
+        <div>
           <AnswerText text={message.text} sources={message.sources} />
           {streaming && <span className="stream-caret" aria-hidden="true" />}
         </div>
