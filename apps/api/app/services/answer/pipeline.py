@@ -22,6 +22,7 @@ safety property.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -61,7 +62,7 @@ from app.services.documents.retrieve import DocumentBlock, render_documents, sel
 from app.services.documents.store import StoredDocument
 from app.services.llm import client as llm
 from app.services.retrieval.hybrid import hybrid_search
-from app.services.retrieval.rerank import rerank
+from app.services.retrieval.rerank import Scored, rerank
 
 logger = get_logger(__name__)
 
@@ -157,11 +158,19 @@ async def _prepare(
     With documents attached (docs/adr/0005), their passages are packed too and
     the request is ready even when no statute clears the floor: "summarise
     this" cannot be scored against the corpus. The citation validator is still
-    the guarantee — the answer must cite something it was given.
+    the guarantee — the answer must cite something it was given. With
+    documents, each candidate's gate score is also its best score against any
+    one clause of the question (:func:`question_clauses`); the floor itself is
+    unchanged, and without documents this step does not run.
     """
     rewrite = await rewrite_question(settings, question, turns or [], api_key=api_key)
     candidates = await hybrid_search(session, settings, rewrite.question, statute_slug=statute_slug)
     ranked = rerank(settings, rewrite.question, candidates)
+    if documents:
+        clauses = question_clauses(rewrite.question)
+        ranked = _best_per_candidate(
+            [ranked, *(rerank(settings, clause, candidates) for clause in clauses)]
+        )
     gate = apply_floor(ranked, floor=settings.RERANK_SCORE_FLOOR, top_n=settings.RERANK_TOP_N)
 
     document_blocks: list[DocumentBlock] = []
@@ -202,6 +211,46 @@ async def _prepare(
         document_blocks=document_blocks,
         documents_used=documents_used,
     )
+
+
+# A clause boundary: after . ? ! or ;, a spaced dash, or a joining word that
+# starts a new question ("..., and what rent does it set?").
+_CLAUSE_BREAK = re.compile(
+    r"(?<=[.?!;])\s+"
+    r"|\s+[—–-]\s+"
+    r"|,?\s+(?:and|but|or)\s+(?=(?:what|which|who|when|where|why|how|is|are|does|do|did"
+    r"|can|could|must|should|will|would|may|has|have)\b)",
+    re.IGNORECASE,
+)
+
+
+def question_clauses(question: str) -> list[str]:
+    """The clauses of a multi-part question; empty when it has only one.
+
+    With a document attached, a question mixes facts about the document with a
+    question about the law ("My lease is for 11 months — must it be
+    registered?"). The cross-encoder scores such a sentence as a whole well
+    below what its law clause scores alone, so the statute gate also scores
+    each clause (fix F3). Splitting is deterministic: no model call.
+    """
+    parts = [part.strip(" ,") for part in _CLAUSE_BREAK.split(question)]
+    clauses = [part for part in parts if len(part) >= 8]
+    return clauses if len(clauses) > 1 else []
+
+
+def _best_per_candidate(rankings: list[list[Scored]]) -> list[Scored]:
+    """Each candidate at the best score any ranking gave it, best first.
+
+    Candidates are the same in every ranking (one search, several readings of
+    the question), so the floor is applied to the same set at its best reading.
+    """
+    best: dict[int, Scored] = {}
+    for ranking in rankings:
+        for item in ranking:
+            current = best.get(item.candidate.chunk_id)
+            if current is None or item.score > current.score:
+                best[item.candidate.chunk_id] = item
+    return sorted(best.values(), key=lambda item: -item.score)
 
 
 def _abstention(prepared: Prepared, *, started: float, reason: str | None = None) -> AskResult:

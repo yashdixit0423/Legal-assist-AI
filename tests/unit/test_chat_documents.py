@@ -11,7 +11,9 @@ from __future__ import annotations
 import io
 import uuid
 import zipfile
-from types import SimpleNamespace
+from collections.abc import AsyncIterator, Callable, Iterator
+from types import ModuleType, SimpleNamespace
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -33,6 +35,11 @@ from app.services.documents.store import (
     DocumentStore,
     StoredDocument,
 )
+from app.services.llm import client as llm_client
+
+if TYPE_CHECKING:
+    from app.services.answer.pack import ContextBlock
+    from app.services.retrieval.rerank import Scored
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -348,9 +355,12 @@ async def test_an_injected_instruction_cannot_get_an_invented_citation_through(
         calls.append(messages)
         return Completion(text="Rent is optional [S9999].", model="m", tokens_in=1, tokens_out=1)
 
-    monkeypatch.setattr(pipeline.llm, "complete", obedient_model)
+    monkeypatch.setattr(llm_client, "complete", obedient_model)
     result = await pipeline.answer_question(
-        None, get_settings(), "Is rent optional?", documents=[_doc()]
+        None,  # type: ignore[arg-type]
+        get_settings(),
+        "Is rent optional?",
+        documents=[_doc()],
     )
     assert result.abstained and not result.answered
     assert result.citation_violation
@@ -384,9 +394,12 @@ async def test_a_document_only_question_is_answered_from_the_document(monkeypatc
             text="Rent is Rs 10,000 a month [D1-p1].", model="m", tokens_in=1, tokens_out=1
         )
 
-    monkeypatch.setattr(pipeline.llm, "complete", model)
+    monkeypatch.setattr(llm_client, "complete", model)
     result = await pipeline.answer_question(
-        None, get_settings(), "Summarise this", documents=[_doc()]
+        None,  # type: ignore[arg-type]
+        get_settings(),
+        "Summarise this",
+        documents=[_doc()],
     )
     assert result.answered
     assert result.cited_document_ids == ["D1-p1"]
@@ -428,7 +441,7 @@ async def test_ask_logs_record_a_count_and_never_document_text():
         async def commit(self):
             return None
 
-    await write_ask_log(FakeSession(), result)
+    await write_ask_log(FakeSession(), result)  # type: ignore[arg-type]
     (row,) = added
     assert isinstance(row, AskLog)
     assert row.documents_used == 1
@@ -567,7 +580,7 @@ CHUNK = 64 * 1024
 ELEVEN_MB = 11 * 1024 * 1024
 
 
-def _streamed_upload(size: int, consumed: list[int]):
+def _streamed_upload(size: int, consumed: list[int]) -> tuple[str, Callable[[], Iterator[bytes]]]:
     """An ~``size``-byte multipart upload, yielded in 64 KB chunks, counting what was pulled."""
     boundary = "----capTestBoundary"
     head = (
@@ -578,7 +591,7 @@ def _streamed_upload(size: int, consumed: list[int]):
     tail = f"\r\n--{boundary}--\r\n".encode()
     content_type = f"multipart/form-data; boundary={boundary}"
 
-    def chunks():
+    def chunks() -> Iterator[bytes]:
         yield head
         consumed[0] += len(head)
         sent = 0
@@ -627,7 +640,7 @@ async def test_an_11_mb_streamed_upload_without_a_length_is_refused_mid_stream(
     consumed = [0]
     content_type, chunks = _streamed_upload(ELEVEN_MB, consumed)
 
-    async def body():
+    async def body() -> AsyncIterator[bytes]:
         for chunk in chunks():
             yield chunk
 
@@ -697,7 +710,7 @@ LEASE = DocumentBlock(
 )
 
 
-def _registration_s17(score: float):
+def _registration_s17(score: float) -> tuple[Scored, ContextBlock]:
     from app.services.answer.pack import ContextBlock
     from app.services.retrieval.hybrid import Candidate
     from app.services.retrieval.rerank import Scored
@@ -729,7 +742,13 @@ def _registration_s17(score: float):
     return Scored(candidate=candidate, score=score), block
 
 
-def _mixed_pipeline(monkeypatch, *, statute_score: float, answer: str, seen: list):
+def _mixed_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    statute_score: float,
+    answer: str,
+    seen: list[list[dict[str, str]]],
+) -> ModuleType:
     from app.services.answer import pipeline
     from app.services.llm.client import Completion
 
@@ -756,8 +775,8 @@ def _mixed_pipeline(monkeypatch, *, statute_score: float, answer: str, seen: lis
             yield word + " "
         yield Completion(text=answer, model="m", tokens_in=1, tokens_out=1)
 
-    monkeypatch.setattr(pipeline.llm, "complete", model)
-    monkeypatch.setattr(pipeline.llm, "stream", stream)
+    monkeypatch.setattr(llm_client, "complete", model)
+    monkeypatch.setattr(llm_client, "stream", stream)
     return pipeline
 
 
@@ -765,7 +784,7 @@ async def test_a_mixed_question_cites_the_law_and_the_document(monkeypatch, sett
     """s.17 clears the floor on its own: it must reach the prompt beside the lease."""
     from app.core.config import get_settings
 
-    seen: list = []
+    seen: list[list[dict[str, str]]] = []
     pipeline = _mixed_pipeline(
         monkeypatch,
         statute_score=0.93,
@@ -803,7 +822,7 @@ async def test_the_statute_floor_is_unchanged_when_a_document_is_attached(
     from app.core.config import get_settings
 
     settings = get_settings()
-    seen: list = []
+    seen: list[list[dict[str, str]]] = []
     pipeline = _mixed_pipeline(
         monkeypatch,
         statute_score=settings.RERANK_SCORE_FLOOR - 0.01,
@@ -820,3 +839,89 @@ async def test_the_statute_floor_is_unchanged_when_a_document_is_attached(
     assert result.blocks == []  # no statute block packed
     assert '<block id="S18">' not in seen[0][1]["content"]
     assert result.cited_document_ids == ["D1-para2"]
+
+
+@pytest.mark.parametrize(
+    ("question", "clauses"),
+    [
+        (
+            "My lease is for 11 months — must it be registered?",
+            ["My lease is for 11 months", "must it be registered?"],
+        ),
+        (
+            "My lease is for eleven months. Must it be registered, and what rent does it set?",
+            ["My lease is for eleven months.", "Must it be registered", "what rent does it set?"],
+        ),
+        ("When must a lease of immoveable property be registered?", []),
+        ("Is a contract with a minor void and unenforceable?", []),
+        ("Summarise this", []),
+    ],
+)
+def test_question_clauses_split_a_mixed_question_and_leave_a_plain_one(
+    question: str, clauses: list[str]
+) -> None:
+    from app.services.answer.pipeline import question_clauses
+
+    assert question_clauses(question) == clauses
+
+
+def _scored_by_question(scores: dict[str, float], calls: list[str]):  # type: ignore[no-untyped-def]
+    """A reranker whose s.17 score depends on the text it is asked to score."""
+    scored, _block = _registration_s17(0.0)
+
+    def stub(_settings: object, question: str, _candidates: object) -> list[object]:
+        from app.services.retrieval.rerank import Scored
+
+        calls.append(question)
+        return [Scored(candidate=scored.candidate, score=scores.get(question, 0.05))]
+
+    return stub
+
+
+MIXED = "My lease is for 11 months — must it be registered?"
+# Measured with nyaya-reranker-mini-v1 (BUILD-LOG, fix F3): the whole question
+# scores s.17 at 0.2728; its law clause alone at 0.7868.
+MIXED_SCORES = {MIXED: 0.2728, "must it be registered?": 0.7868}
+
+
+async def test_a_mixed_question_clears_the_floor_on_its_law_clause(
+    monkeypatch: pytest.MonkeyPatch, settings_env: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    seen: list[list[dict[str, str]]] = []
+    calls: list[str] = []
+    pipeline = _mixed_pipeline(
+        monkeypatch,
+        statute_score=0.0,
+        answer="Eleven months [D1-para2]; s.17 covers terms over a year [S18].",
+        seen=seen,
+    )
+    monkeypatch.setattr(pipeline, "rerank", _scored_by_question(MIXED_SCORES, calls))
+    result = await pipeline.answer_question(
+        None, get_settings(), MIXED, documents=[_doc(doc_id="doc-lease000")]
+    )
+    assert result.answered
+    assert result.cited_section_ids == [18]
+    assert [block.section_id for block in result.blocks] == [18]
+    assert result.top_score == pytest.approx(0.7868)
+    assert '<block id="S18">' in seen[0][1]["content"]
+    assert calls == [MIXED, "My lease is for 11 months", "must it be registered?"]
+
+
+async def test_without_documents_the_gate_reads_only_the_whole_question(
+    monkeypatch: pytest.MonkeyPatch, settings_env: pytest.MonkeyPatch
+) -> None:
+    """The law-only path is untouched: one rerank, of the whole question, and it abstains."""
+    from app.core.config import get_settings
+
+    seen: list[list[dict[str, str]]] = []
+    calls: list[str] = []
+    pipeline = _mixed_pipeline(monkeypatch, statute_score=0.0, answer="unused", seen=seen)
+    monkeypatch.setattr(pipeline, "rerank", _scored_by_question(MIXED_SCORES, calls))
+    result = await pipeline.answer_question(None, get_settings(), MIXED)
+    assert result.abstained
+    assert result.abstain_reason == "below_score_floor"
+    assert result.top_score == pytest.approx(0.2728)
+    assert calls == [MIXED]
+    assert seen == []  # no model call
