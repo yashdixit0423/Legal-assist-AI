@@ -78,7 +78,7 @@ export function AnswerPanel({ state }: { state: AnswerState }) {
   );
 }
 
-function Abstention({ state }: { state: AnswerState }) {
+export function Abstention({ state }: { state: AnswerState }) {
   return (
     <div className="answer-card">
       <div className="flex items-start gap-3">
@@ -126,7 +126,7 @@ function Abstention({ state }: { state: AnswerState }) {
   );
 }
 
-function SourceList({ state }: { state: AnswerState }) {
+export function SourceList({ state }: { state: AnswerState }) {
   const cited = state.sources.filter((source) =>
     state.citedIds.includes(source.section_id),
   );
