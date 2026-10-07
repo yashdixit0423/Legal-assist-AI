@@ -5,7 +5,10 @@ import {
   ChatComposer,
   type ChatComposerHandle,
 } from "@/components/chat/ChatComposer";
+import { AttachmentButton } from "@/components/chat/AttachmentButton";
+import { AttachmentPreview } from "@/components/chat/AttachmentPreview";
 import { ChatEmptyState } from "@/components/chat/ChatEmptyState";
+import { DocumentDropZone } from "@/components/chat/DocumentDropZone";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { NewChatDialog } from "@/components/chat/NewChatDialog";
@@ -23,6 +26,7 @@ import {
 } from "@/components/ui/resizable";
 import { useAuth, useRateLimit } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
+import { DOCUMENTS_ENABLED, MAX_FILES } from "@/lib/chat/files";
 
 /**
  * Chat: a multi-turn conversation over the unchanged `/v1/ask` pipeline.
@@ -93,12 +97,17 @@ export default function Chat() {
     <div className="mx-auto flex min-h-0 w-full max-w-[840px] flex-1 flex-col px-5 sm:px-8">
       <ChatHeader onNewChat={startOver} canReset={chat.messages.length > 0} />
 
-      <ChatMessageList
-        messages={chat.messages}
-        streaming={chat.streaming}
-        onRegenerate={chat.regenerate}
-        empty={<ChatEmptyState onPick={signedIn ? fill : undefined} />}
-      />
+      <DocumentDropZone
+        onFiles={chat.attach}
+        disabled={!DOCUMENTS_ENABLED || !signedIn}
+      >
+        <ChatMessageList
+          messages={chat.messages}
+          streaming={chat.streaming}
+          onRegenerate={chat.regenerate}
+          empty={<ChatEmptyState onPick={signedIn ? fill : undefined} />}
+        />
+      </DocumentDropZone>
 
       <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
         <ChatComposer
@@ -109,6 +118,35 @@ export default function Chat() {
           onStop={chat.stop}
           streaming={chat.streaming}
           disabled={!signedIn || exhausted}
+          leading={
+            DOCUMENTS_ENABLED && signedIn ? (
+              <AttachmentButton
+                onFiles={chat.attach}
+                disabled={
+                  chat.attachments.filter((a) => a.status !== "error").length >=
+                  MAX_FILES
+                }
+              />
+            ) : undefined
+          }
+          header={
+            DOCUMENTS_ENABLED && chat.attachments.length > 0 ? (
+              <div className="mb-2 space-y-1.5 border-b border-[hsl(var(--line))] pb-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {chat.attachments.map((attachment) => (
+                    <AttachmentPreview
+                      key={attachment.id}
+                      attachment={attachment}
+                      onRemove={() => chat.detach(attachment.id)}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-[hsl(var(--ink-4))]">
+                  Documents are processed temporarily and not stored.
+                </p>
+              </div>
+            ) : undefined
+          }
           disabledHint={
             !signedIn ? (
               <Link

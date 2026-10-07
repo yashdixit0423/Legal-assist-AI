@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { askStream } from "@/lib/api/ask";
 import { ApiError } from "@/lib/api/client";
 import type { AskDonePayload, SourceBlock, Turn } from "@/lib/api/types";
+import { MAX_FILES, checkFile, type DocumentKind } from "@/lib/chat/files";
 
 /**
  * The Chat conversation, held in memory only.
@@ -27,6 +28,23 @@ export interface ChatAbstention {
   scoreFloor: number;
 }
 
+/** A document attached to the conversation. The bytes stay in the browser's memory. */
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  kind: DocumentKind;
+  size: number;
+  /** Kept so the user can reopen their own file; never persisted. */
+  file?: File;
+  status: "uploading" | "ready" | "error";
+  /** 0-100 while uploading. */
+  progress: number;
+  /** The server's id once the document has been read (Phase 6). */
+  documentId?: string;
+  pages?: number | null;
+  error?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -40,6 +58,8 @@ export interface ChatMessage {
   /** A drafted answer cited outside the retrieved set and is being rewritten. */
   invalidating?: boolean;
   done?: AskDonePayload;
+  /** On a user message: the documents in play when it was sent. */
+  attachments?: ChatAttachment[];
 }
 
 let counter = 0;
@@ -98,6 +118,9 @@ function placeholder(): ChatMessage {
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const attachmentsRef = useRef<ChatAttachment[]>([]);
+  attachmentsRef.current = attachments;
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
   const abort = useRef<AbortController | null>(null);
@@ -225,6 +248,8 @@ export function useChat() {
         citedIds: [],
         status: "done",
       };
+      const ready = attachmentsRef.current.filter((a) => a.status === "ready");
+      if (ready.length) user.attachments = ready;
       const answer = placeholder();
       const turns = buildTurns(current, current.length);
       setMessages([...current, user, answer]);
@@ -250,10 +275,53 @@ export function useChat() {
 
   const stop = useCallback(() => abort.current?.abort(), []);
 
+  /**
+   * Validate and add files. A rejected file still shows as a chip with the
+   * reason, so the user sees why rather than nothing happening.
+   */
+  const attach = useCallback(async (files: File[]) => {
+    const room =
+      MAX_FILES -
+      attachmentsRef.current.filter((a) => a.status !== "error").length;
+    for (const [index, file] of files.entries()) {
+      const id = nextId();
+      const base = { id, name: file.name, size: file.size, file, progress: 0 };
+      if (index >= room) {
+        setAttachments((list) => [
+          ...list,
+          {
+            ...base,
+            kind: "txt",
+            status: "error",
+            error: `Up to ${MAX_FILES} documents per conversation.`,
+          },
+        ]);
+        continue;
+      }
+      const check = await checkFile(file);
+      if ("reason" in check) {
+        setAttachments((list) => [
+          ...list,
+          { ...base, kind: "txt", status: "error", error: check.reason },
+        ]);
+        continue;
+      }
+      setAttachments((list) => [
+        ...list,
+        { ...base, kind: check.kind, status: "ready", progress: 100 },
+      ]);
+    }
+  }, []);
+
+  const detach = useCallback((id: string) => {
+    setAttachments((list) => list.filter((a) => a.id !== id));
+  }, []);
+
   const reset = useCallback(() => {
     abort.current?.abort();
     abort.current = null;
     setMessages([]);
+    setAttachments([]);
   }, []);
 
   return {
@@ -263,5 +331,8 @@ export function useChat() {
     regenerate,
     stop,
     reset,
+    attachments,
+    attach,
+    detach,
   };
 }
