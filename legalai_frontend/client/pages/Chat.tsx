@@ -12,6 +12,7 @@ import { DocumentDropZone } from "@/components/chat/DocumentDropZone";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { NewChatDialog } from "@/components/chat/NewChatDialog";
+import { VoiceInputButton } from "@/components/chat/VoiceInputButton";
 import {
   DocumentOpenContext,
   SourceOpenContext,
@@ -131,6 +132,15 @@ export default function Chat() {
           streaming={chat.streaming}
           sendBlocked={chat.uploading}
           disabled={!signedIn || exhausted}
+          trailing={
+            signedIn && !exhausted ? (
+              <VoiceInputButton
+                value={draft}
+                onChange={setDraft}
+                disabled={chat.streaming}
+              />
+            ) : undefined
+          }
           leading={
             DOCUMENTS_ENABLED && signedIn ? (
               <AttachmentButton
