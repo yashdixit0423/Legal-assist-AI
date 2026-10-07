@@ -636,3 +636,50 @@ async def test_an_11_mb_streamed_upload_without_a_length_is_refused_mid_stream(
     )
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "file_too_large"
+
+
+# --- PDF page cap (fix F4) and the single-process warning ------------------
+
+
+def test_a_pdf_over_100_pages_is_refused_with_its_page_count():
+    from app.services.documents.extract import MAX_PDF_PAGES, DocumentTooLongError
+
+    assert MAX_PDF_PAGES == 100
+    with pytest.raises(DocumentTooLongError) as refused:
+        extract(_pdf([f"Page {n} of the schedule." for n in range(101)]))
+    assert refused.value.code == "document_too_long"
+    assert refused.value.http_status == 413
+    assert refused.value.message == "This PDF has 101 pages; the limit is 100."
+    assert extract(_pdf([f"Page {n} of the schedule." for n in range(100)])).pages == 100
+
+
+@pytest.mark.parametrize(
+    ("environ", "argv", "workers"),
+    [
+        ({}, ["uvicorn", "app.main:app"], 1),
+        ({"WEB_CONCURRENCY": "4"}, ["uvicorn"], 4),
+        ({}, ["uvicorn", "app.main:app", "--workers", "3"], 3),
+        ({}, ["uvicorn", "--workers=2"], 2),
+        ({}, ["gunicorn", "-w", "5"], 5),
+        ({"WEB_CONCURRENCY": "1"}, ["uvicorn"], 1),
+    ],
+)
+def test_configured_workers_reads_env_and_flags(environ, argv, workers):
+    from app.services.documents.store import configured_workers
+
+    assert configured_workers(environ, argv) == workers
+
+
+def test_more_than_one_worker_logs_a_warning(monkeypatch):
+    from app.services.documents import store as store_module
+
+    warnings = []
+    monkeypatch.setattr(
+        store_module.logger, "warning", lambda event, **kw: warnings.append((event, kw))
+    )
+    assert not store_module.warn_if_multiple_workers({}, ["uvicorn"])
+    assert store_module.warn_if_multiple_workers({"WEB_CONCURRENCY": "2"}, ["uvicorn"])
+    ((event, fields),) = warnings
+    assert event == "chat_documents_single_process_only"
+    assert fields["workers"] == 2
+    assert "document_not_found" in fields["detail"]

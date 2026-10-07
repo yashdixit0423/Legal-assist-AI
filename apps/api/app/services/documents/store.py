@@ -13,17 +13,21 @@ Move this to Redis with the same TTL before running more than one worker.
 from __future__ import annotations
 
 import datetime as dt
+import os
+import re
 import secrets
+import sys
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
 
 from app.core.errors import LegalEdgeError
+from app.core.logging import get_logger
 from app.services.documents.extract import DocumentKind, LocatorKind
 
 IDLE_TTL_SECONDS = 60 * 60
@@ -142,6 +146,57 @@ class DocumentStore:
 
 _STORE = DocumentStore()
 
+logger = get_logger(__name__)
+
+_WORKER_FLAG = re.compile(r"^(?:--workers|-w)(?:=(\d+))?$")
+
+
+def configured_workers(
+    environ: Mapping[str, str] | None = None, argv: Sequence[str] | None = None
+) -> int:
+    """How many server processes the launch configuration asks for.
+
+    Reads the conventional places: ``WEB_CONCURRENCY`` (uvicorn, gunicorn and
+    most PaaS), ``UVICORN_WORKERS``, and ``--workers N`` / ``-w N`` on the
+    command line. It is a best effort — a process manager can still start
+    several copies behind a load balancer, which no process can see.
+    """
+    env = os.environ if environ is None else environ
+    args = list(sys.argv if argv is None else argv)
+    counts = [
+        int(value)
+        for key in ("WEB_CONCURRENCY", "UVICORN_WORKERS")
+        if (value := env.get(key, "").strip()).isdigit()
+    ]
+    for index, arg in enumerate(args):
+        match = _WORKER_FLAG.match(arg)
+        if not match:
+            continue
+        value = match.group(1) or (args[index + 1] if index + 1 < len(args) else "")
+        if value.isdigit():
+            counts.append(int(value))
+    return max(counts, default=1)
+
+
+def warn_if_multiple_workers(
+    environ: Mapping[str, str] | None = None, argv: Sequence[str] | None = None
+) -> bool:
+    """Say plainly, at startup, that Chat documents will not be shared."""
+    workers = configured_workers(environ, argv)
+    if workers <= 1:
+        return False
+    logger.warning(
+        "chat_documents_single_process_only",
+        workers=workers,
+        detail=(
+            f"{workers} worker processes are configured, but uploaded Chat documents "
+            "are held in one process's memory (docs/adr/0005). A question routed to "
+            "a different worker than the upload will get document_not_found. Run a "
+            "single worker, or move the document store to Redis."
+        ),
+    )
+    return True
+
 
 def get_store() -> DocumentStore:
     return _STORE
@@ -152,6 +207,8 @@ __all__ = [
     "DocumentNotFoundError",
     "DocumentStore",
     "StoredDocument",
+    "configured_workers",
     "get_store",
     "new_document_id",
+    "warn_if_multiple_workers",
 ]

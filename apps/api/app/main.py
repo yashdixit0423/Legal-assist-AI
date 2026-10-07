@@ -21,6 +21,7 @@ from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.core.ratelimit import warn_if_not_shared
 from app.db.session import dispose_engine
+from app.services.documents.store import warn_if_multiple_workers
 
 logger = get_logger(__name__)
 
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         device=settings.MODEL_DEVICE,
     )
     warn_if_not_shared(settings)
+    warn_if_multiple_workers()
     if settings.WARM_MODELS_ON_START:
         await _warm_models(settings)
     try:
