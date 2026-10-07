@@ -3,6 +3,7 @@ import {
   BookOpenText,
   LogIn,
   Menu,
+  MessagesSquare,
   Moon,
   Scale,
   Search as SearchIcon,
@@ -14,7 +15,17 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 
-export function LegalAssistLayout({ children }: { children: React.ReactNode }) {
+/**
+ * `variant="app"` is opt-in for full-height tools (Chat): no footer, and `main`
+ * fills the viewport below the header (72px + 1px border). Every other page uses the default.
+ */
+export function LegalAssistLayout({
+  children,
+  variant = "page",
+}: {
+  children: React.ReactNode;
+  variant?: "page" | "app";
+}) {
   const location = useLocation();
   const [dark, setDark] = useState(() => {
     const savedTheme = localStorage.getItem("legalassist-theme");
@@ -36,6 +47,7 @@ export function LegalAssistLayout({ children }: { children: React.ReactNode }) {
     { to: "/ask", label: "Ask", icon: Scale },
     { to: "/search", label: "Search", icon: SearchIcon },
     { to: "/browse", label: "Browse the law", icon: BookOpenText },
+    { to: "/chat", label: "Chat", icon: MessagesSquare },
   ];
 
   return (
@@ -139,13 +151,19 @@ export function LegalAssistLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </header>
-      <main>{children}</main>
-      <footer className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-[hsl(var(--line))] px-5 py-7 text-xs text-[hsl(var(--ink-3))] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-        <p>LegalAssist AI · Read the source. Ask with context.</p>
-        <p>
-          Not legal advice. Each Act carries its own as-of date; see Browse.
-        </p>
-      </footer>
+      {variant === "app" ? (
+        <main className="flex h-[calc(100dvh-73px)] flex-col">{children}</main>
+      ) : (
+        <main>{children}</main>
+      )}
+      {variant === "page" && (
+        <footer className="mx-auto flex max-w-[1440px] flex-col gap-2 border-t border-[hsl(var(--line))] px-5 py-7 text-xs text-[hsl(var(--ink-3))] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+          <p>LegalAssist AI · Read the source. Ask with context.</p>
+          <p>
+            Not legal advice. Each Act carries its own as-of date; see Browse.
+          </p>
+        </footer>
+      )}
     </div>
   );
 }

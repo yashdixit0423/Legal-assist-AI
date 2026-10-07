@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Ask from "./pages/Ask";
 import Browse from "./pages/Browse";
+import Chat from "./pages/Chat";
 import Search from "./pages/Search";
 import Section from "./pages/Section";
 import Settings from "./pages/Settings";
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/browse" element={<Browse />} />
           <Route path="/browse/:slug" element={<Browse />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/chat" element={<Chat />} />
           <Route path="/sections/:sectionId" element={<Section />} />
           <Route
             path="/statutes/:slug/sections/:sectionNo"
