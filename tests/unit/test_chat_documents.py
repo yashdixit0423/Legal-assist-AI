@@ -909,6 +909,46 @@ async def test_a_mixed_question_clears_the_floor_on_its_law_clause(
     assert calls == [MIXED, "My lease is for 11 months", "must it be registered?"]
 
 
+async def test_a_follow_up_rewrite_that_fuses_the_clauses_still_reads_them(
+    monkeypatch: pytest.MonkeyPatch, settings_env: pytest.MonkeyPatch
+) -> None:
+    """Seen in the Chat smoke test: with a prior turn the rewrite returned one
+    sentence (0.1041), so the clauses come from the question as asked too."""
+    from app.core.config import get_settings
+    from app.services.answer.rewrite import Rewrite
+
+    fused = "Does my 11-month lease agreement need to be registered?"
+    seen: list[list[dict[str, str]]] = []
+    calls: list[str] = []
+    pipeline = _mixed_pipeline(
+        monkeypatch,
+        statute_score=0.0,
+        answer="Eleven months [D1-para2]; s.17 covers terms over a year [S18].",
+        seen=seen,
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "rerank",
+        _scored_by_question({fused: 0.1041, "must it be registered?": 0.8005}, calls),
+    )
+
+    async def rewrite(*_args: object, **_kwargs: object) -> Rewrite:
+        return Rewrite(question=fused, original=MIXED, rewritten=True)
+
+    monkeypatch.setattr(pipeline, "rewrite_question", rewrite)
+    result = await pipeline.answer_question(
+        None,
+        get_settings(),
+        MIXED,
+        turns=[{"role": "user", "content": "What rent does it set?"}],
+        documents=[_doc(doc_id="doc-lease000")],
+    )
+    assert result.answered
+    assert result.cited_section_ids == [18]
+    assert result.top_score == pytest.approx(0.8005)
+    assert calls == [fused, "My lease is for 11 months", "must it be registered?"]
+
+
 async def test_without_documents_the_gate_reads_only_the_whole_question(
     monkeypatch: pytest.MonkeyPatch, settings_env: pytest.MonkeyPatch
 ) -> None:

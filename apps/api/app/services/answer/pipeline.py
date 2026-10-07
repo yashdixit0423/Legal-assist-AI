@@ -160,14 +160,20 @@ async def _prepare(
     this" cannot be scored against the corpus. The citation validator is still
     the guarantee — the answer must cite something it was given. With
     documents, each candidate's gate score is also its best score against any
-    one clause of the question (:func:`question_clauses`); the floor itself is
-    unchanged, and without documents this step does not run.
+    one clause of the question, as rewritten or as asked
+    (:func:`question_clauses`); the floor itself is unchanged, and without
+    documents this step does not run.
     """
     rewrite = await rewrite_question(settings, question, turns or [], api_key=api_key)
     candidates = await hybrid_search(session, settings, rewrite.question, statute_slug=statute_slug)
     ranked = rerank(settings, rewrite.question, candidates)
     if documents:
-        clauses = question_clauses(rewrite.question)
+        # The original wording too: a follow-up's rewrite tends to fuse the
+        # clauses back into one sentence ("Does my 11-month lease need to be
+        # registered?"), which scores as low as the unsplit question.
+        clauses = list(
+            dict.fromkeys(question_clauses(rewrite.question) + question_clauses(rewrite.original))
+        )
         ranked = _best_per_candidate(
             [ranked, *(rerank(settings, clause, candidates) for clause in clauses)]
         )
