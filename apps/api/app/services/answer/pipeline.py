@@ -181,7 +181,9 @@ async def answer_question(
     violation = check.violation
     if not check.ok:
         logger.warning("citation_check_failed", reason=check.reason, attempt=1)
-        completion = await llm.complete(settings, _retry_messages(prepared, completion.text, check))
+        completion = await llm.complete(
+            settings, _retry_messages(prepared, completion.text, check), api_key=api_key
+        )
         check = validate_citations(completion.text, prepared.allowed)
         if not check.ok:
             logger.error("citation_check_failed_twice", reason=check.reason)
@@ -262,7 +264,9 @@ async def stream_answer(
     once it is known to be clean.
     """
     started = time.perf_counter()
-    prepared = await _prepare(session, settings, question, turns=turns, statute_slug=statute_slug)
+    prepared = await _prepare(
+        session, settings, question, turns=turns, statute_slug=statute_slug, api_key=api_key
+    )
 
     if prepared.rewrite.changed:
         yield Event("token", {"text": ""}), None  # keeps the connection warm
