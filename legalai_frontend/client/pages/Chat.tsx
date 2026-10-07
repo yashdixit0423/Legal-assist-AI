@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -28,7 +28,11 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useAuth, useRateLimit } from "@/hooks/use-auth";
-import { useChat } from "@/hooks/use-chat";
+import {
+  useChat,
+  type ChatAttachment,
+  type ChatMessage,
+} from "@/hooks/use-chat";
 import type { DocumentSourceBlock } from "@/lib/api/types";
 import { DOCUMENTS_ENABLED, MAX_FILES } from "@/lib/chat/files";
 
@@ -50,6 +54,30 @@ export default function Chat() {
   const mode = usePanelMode();
 
   const exhausted = rateLimit !== null && rateLimit.remaining <= 0;
+  const announcement = useMemo(
+    () => answerStatus(chat.messages),
+    [chat.messages],
+  );
+  const uploadAnnouncement = useMemo(
+    () => attachmentStatus(chat.attachments),
+    [chat.attachments],
+  );
+  const bottomBar = useRef<HTMLDivElement>(null);
+
+  // On a phone the on-screen keyboard shrinks the visual viewport without
+  // resizing the layout viewport, which can leave the composer underneath it.
+  // Keep it in view while the user is typing.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const keepVisible = () => {
+      if (document.activeElement?.id === "chat-input") {
+        bottomBar.current?.scrollIntoView({ block: "end" });
+      }
+    };
+    viewport.addEventListener("resize", keepVisible);
+    return () => viewport.removeEventListener("resize", keepVisible);
+  }, []);
 
   const send = () => {
     // A document still being read would silently miss this question.
@@ -122,7 +150,18 @@ export default function Chat() {
         />
       </DocumentDropZone>
 
-      <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+      <div
+        ref={bottomBar}
+        className="pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
+      >
+        {/* Polite status for screen readers: the streamed text itself is
+            muted while it streams (aria-busy), so progress is announced here. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </p>
+        <p className="sr-only" aria-live="polite">
+          {uploadAnnouncement}
+        </p>
         <ChatComposer
           ref={composer}
           value={draft}
@@ -164,7 +203,7 @@ export default function Chat() {
                     />
                   ))}
                 </div>
-                <p className="text-[11px] text-[hsl(var(--ink-4))]">
+                <p className="text-[11px] text-[hsl(var(--ink-3))]">
                   Documents are processed temporarily and not stored.
                 </p>
               </div>
@@ -187,7 +226,7 @@ export default function Chat() {
           }
         />
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5">
-          <p className="text-[11px] text-[hsl(var(--ink-4))]">
+          <p className="text-[11px] text-[hsl(var(--ink-3))]">
             Informational assistance, not legal advice. Verify important matters
             with a qualified professional.
           </p>
@@ -266,4 +305,28 @@ export default function Chat() {
       />
     </LegalAssistLayout>
   );
+}
+
+/** What a screen reader should hear about the latest answer, in plain words. */
+function answerStatus(messages: ChatMessage[]): string {
+  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  if (!last) return "";
+  if (last.status === "streaming") {
+    if (last.invalidating) return "Correcting the answer.";
+    if (last.phase === "searching") return "Searching the indexed Acts…";
+    if (last.phase === "preparing") return "Preparing answer…";
+    return "Writing the answer…";
+  }
+  if (last.status === "stopped") return "Stopped.";
+  if (last.status === "error") return "The request did not complete.";
+  if (last.abstain) return "No provision in the indexed corpus answers this.";
+  return "Answer ready.";
+}
+
+function attachmentStatus(attachments: ChatAttachment[]): string {
+  const last = attachments[attachments.length - 1];
+  if (!last) return "";
+  if (last.status === "uploading") return `Reading ${last.name}…`;
+  if (last.status === "ready") return `${last.name} is attached.`;
+  return `${last.name} couldn't be attached. ${last.error ?? ""}`;
 }

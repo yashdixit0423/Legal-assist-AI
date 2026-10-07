@@ -19,7 +19,7 @@ export function ChatHeader({
           A conversation grounded in the indexed Acts, with every answer cited
           to its section.
         </p>
-        <p className="mt-1 text-[11px] text-[hsl(var(--ink-4))]">
+        <p className="mt-1 text-[11px] text-[hsl(var(--ink-3))]">
           Conversations aren't saved. Reloading starts a new chat.
         </p>
       </div>

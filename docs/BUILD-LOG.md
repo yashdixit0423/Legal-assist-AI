@@ -1919,3 +1919,60 @@ microbenchmark of one model on a momentarily quiet machine predicts nothing
 about a batch job on a loaded one. Every projection I made from one
 (29 min, 14 min, "3-8× for MPS") was wrong by 3× to 8×, always in the same
 direction. The 20-case probe was the only estimate that held, and it is cheap.
+
+## 2026-10-07 · Chat / Legal AI Assistant — Phases 1–8 of docs/CHAT-PLAN.md
+
+**Built.** A fourth section, Chat, at `/chat`, implemented phase by phase with a
+local commit each: shell and nav (1), in-memory multi-turn chat over the
+unchanged `/v1/ask` (2), the source panel — split ≥1280px, sheet 768–1279px,
+drawer below (3), Markdown answers via `react-markdown` + `remark-gfm` with
+citation chips inside lists and tables (4), the attachment UI (5), ephemeral
+document context per ADR 0005 (6), Web Speech voice input (7), and hardening (8).
+
+**Decisions used:** D1 Web Speech API, D2 react-markdown + remark-gfm, D3 PDF + TXT
++ DOCX, D4 in-memory store with a 60-minute idle TTL, D5 shared 20/hour limit,
+D6 "Chat", D7 no feedback buttons.
+
+**Deviations from the plan, and why.**
+
+- `SourceList` rows also take an optional `onOpen` (the plan listed it for
+  `CitationChip` only): a row's `<a href>` would leave the page and discard the
+  in-memory conversation. Ask passes nothing and renders identically.
+- `api/v1/ask.py` and `api/v1/__init__.py` changed (not listed in §3): the
+  endpoint must resolve `document_ids` and the new router must be registered.
+- Tab-close deletion uses `fetch(..., {keepalive: true})`, not `sendBeacon`,
+  which cannot carry the `Authorization` header.
+- DOCX/TXT passages are one paragraph each (grouping misattributed a clause to
+  the first paragraph of its group); short heading lines join the next one.
+- The upload bypasses `UploadFile`, which spools parts over 1 MB to disk.
+- `lxml==5.3.2` moved with `pymupdf` from the corpus extra to the API
+  dependencies, because `python-docx` needs it at runtime.
+- Chat's three notices use `--ink-3` rather than `--ink-4` (contrast, below).
+
+**Fixed on the way.** `stream_answer` called `_prepare` without the caller's key,
+so a follow-up's rewrite fell back to the env key (dev) or was skipped silently
+(production); the buffered path's citation retry had the same omission
+(commit `fix(ask): …`).
+
+**Known, not fixed.**
+
+- Light-theme `--ink-4` on `--canvas` is 2.4:1 and `--ink-3` 4.1:1, both under
+  WCAG AA for small text. They are app-wide tokens; changing them restyles
+  every page, so it is left for a decision.
+- Streaming is effectively buffered: `_stream_attempt` collects every token
+  before yielding any, so "Preparing answer…" covers the whole generation.
+- The JS bundle grew from 383 kB to 664 kB (205 kB gzip), over Vite's 500 kB
+  warning; most of it is the Markdown stack and the Chat page. Lazy-loading
+  `/chat` would fix it but needs an `App.tsx` change beyond the planned route.
+- `npm audit`: 5 findings (4 moderate, 1 high) in react-router,
+  @tailwindcss/typography, postcss-selector-parser and source-map-js — all
+  pre-existing; none in the two packages Chat added.
+- Voice transcription could not be exercised in the in-app browser (microphone
+  blocked); the permission-denied path was.
+- With a document attached, statute retrieval runs on the whole question; a
+  question mixing the document and the law ("my lease is 11 months — must it be
+  registered?") can miss the statute floor, and the answer then says the
+  documents don't cover registration. Honest, but weaker than a split query.
+- Focus returns to the element focused when a panel opened. Safari does not
+  focus buttons on click, so there it falls back to the page.
+

@@ -110,7 +110,7 @@ alembic revision --autogenerate -m "what changed"
 ```
 
 The URL comes from `DATABASE_URL` via `Settings`, not from `alembic.ini`. Head is
-`0001`. Section ordering is by `section_no_sort`, never by `section_no` — see
+`0002` (`ask_logs.documents_used`, for Chat documents). Section ordering is by `section_no_sort`, never by `section_no` — see
 [docs/adr/0003](docs/adr/0003-identifiers-and-citation-ordering.md).
 
 ## Run the CLI
@@ -153,6 +153,39 @@ Two things are worth understanding about the response:
   An answer citing anything else is regenerated once and then abstained on. That
   check — not the prompt instruction asking for it — is what makes the grounding
   claim testable.
+
+## Chat (Legal AI Assistant)
+
+The web app has a fourth section, **Chat** (`/chat`), next to Ask, Search and
+Browse. It is a multi-turn conversation over the same `POST /v1/ask` pipeline —
+same retrieval, same abstention gate, same citation validator, same 20-an-hour
+limit — with the last six answered exchanges sent as `turns`. Citations open the
+verbatim section beside the conversation instead of navigating away.
+The plan, and every decision behind it, is in [docs/CHAT-PLAN.md](docs/CHAT-PLAN.md).
+
+**Retention.** Nothing about a conversation is stored: it lives in the browser
+tab's memory and a reload starts a new chat. The only server-side trace is the
+existing anonymous `ask_logs` row per question.
+
+**Documents** (PDF, TXT, DOCX up to 10 MB, three per conversation) are governed
+by [ADR 0005](docs/adr/0005-ephemeral-document-context.md):
+
+- `POST /v1/chat/documents` (multipart, signed in, 30/hour) reads the file in
+  memory, detects its type from the bytes, chunks and embeds it with the corpus
+  models, and returns metadata only. `DELETE /v1/chat/documents/{id}` forgets it.
+- Documents live in **process memory** for 60 minutes of idle time and are never
+  written to disk, Redis or the database. **Run a single API process** — a second
+  worker would not see the first one's documents. Set
+  `VITE_CHAT_DOCUMENTS=false` in `legalai_frontend/.env` to hide attachments.
+- Answers cite document passages as `[D1-p4]` (PDF page) or `[D2-para12]`
+  (paragraph), validated like statute ids. Document text is never logged;
+  `ask_logs.documents_used` records a count.
+- Scanned PDFs (no text layer) are refused; OCR is out of scope.
+
+**Voice input** uses the browser's Web Speech API (Chrome, Edge, Safari; audio
+goes to the browser vendor, never to this server). The transcript fills the
+message box and is never sent automatically. The mic is hidden where the API
+is unavailable.
 
 ## Run the tests
 
