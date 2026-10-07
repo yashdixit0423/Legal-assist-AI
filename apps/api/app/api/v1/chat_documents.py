@@ -1,10 +1,14 @@
 """``/v1/chat/documents`` — temporary document context for Chat (docs/adr/0005).
 
-The body is read off the stream with a hard byte cap and parsed in memory.
+The body is parsed **as it arrives**, chunk by chunk, and only the ``file``
+part is kept. The moment that part passes 10 MB the read stops with
+``file_too_large``: the server never buffers a whole oversized body to find
+out it is oversized, and never holds more than the limit plus one chunk.
+A ``Content-Length`` over the limit is refused before reading anything.
+
 FastAPI's ``UploadFile`` is deliberately not used: Starlette spools any part
 over 1 MB to a temporary file, and "nothing uploaded is written to disk" is a
-rule here, not a preference. The cap also means a client cannot make the
-server read a gigabyte just to refuse it.
+rule here, not a preference.
 """
 
 from __future__ import annotations
@@ -33,83 +37,115 @@ router = APIRouter(prefix="/chat/documents", tags=["chat"])
 logger = get_logger(__name__)
 
 UPLOADS_PER_HOUR = 30
-# The file plus generous room for the multipart envelope.
-MAX_BODY_BYTES = MAX_BYTES + 64 * 1024
+# Room for the multipart envelope and any small non-file fields.
+ENVELOPE_BYTES = 64 * 1024
+MAX_BODY_BYTES = MAX_BYTES + ENVELOPE_BYTES
 
 DocumentId = Annotated[str, Path(min_length=8, max_length=64)]
 
 
-async def _read_capped(request: Request) -> bytes:
+class FileUploadReader:
+    """An incremental multipart reader that keeps only the ``file`` part.
+
+    ``feed`` takes the body one chunk at a time. Bytes of other parts are
+    counted and dropped; bytes of the file part are kept, and the first byte
+    past ``max_file_bytes`` raises :class:`FileTooLargeError` mid-stream.
+    ``peak_file_bytes`` records the most ever held, for the tests.
+    """
+
+    def __init__(
+        self,
+        content_type: str,
+        *,
+        max_file_bytes: int = MAX_BYTES,
+        max_body_bytes: int = MAX_BODY_BYTES,
+    ) -> None:
+        mime, params = parse_options_header(content_type)
+        boundary = params.get(b"boundary")
+        if mime != b"multipart/form-data" or not boundary:
+            raise InvalidRequestError("Send the document as multipart/form-data in a 'file' field.")
+        self.max_file_bytes = max_file_bytes
+        self.max_body_bytes = max_body_bytes
+        self.received = 0
+        self.peak_file_bytes = 0
+        self._file = bytearray()
+        self._filename: str | None = None
+        self._found = False
+        self._in_file = False
+        self._headers: dict[bytes, bytes] = {}
+        self._field = bytearray()
+        self._value = bytearray()
+        self._parser = MultipartParser(
+            boundary,
+            {
+                "on_part_begin": self._part_begin,
+                "on_header_field": self._header_field,
+                "on_header_value": self._header_value,
+                "on_header_end": self._header_end,
+                "on_headers_finished": self._headers_finished,
+                "on_part_data": self._part_data,
+            },
+        )
+
+    def _part_begin(self) -> None:
+        self._headers = {}
+        self._in_file = False
+
+    def _header_field(self, data: bytes, start: int, end: int) -> None:
+        self._field.extend(data[start:end])
+
+    def _header_value(self, data: bytes, start: int, end: int) -> None:
+        self._value.extend(data[start:end])
+
+    def _header_end(self) -> None:
+        self._headers[bytes(self._field).lower()] = bytes(self._value)
+        self._field.clear()
+        self._value.clear()
+
+    def _headers_finished(self) -> None:
+        _, disposition = parse_options_header(self._headers.get(b"content-disposition", b""))
+        if disposition.get(b"name") == b"file" and not self._found:
+            self._found = self._in_file = True
+            raw = disposition.get(b"filename")
+            self._filename = raw.decode("utf-8", "replace") if raw else None
+
+    def _part_data(self, data: bytes, start: int, end: int) -> None:
+        if not self._in_file:
+            return  # other fields: counted in `received`, never kept
+        if len(self._file) + (end - start) > self.max_file_bytes:
+            raise FileTooLargeError()
+        self._file.extend(data[start:end])
+        self.peak_file_bytes = max(self.peak_file_bytes, len(self._file))
+
+    def feed(self, chunk: bytes) -> None:
+        self.received += len(chunk)
+        if self.received > self.max_body_bytes:
+            raise FileTooLargeError()
+        try:
+            self._parser.write(chunk)
+        except FileTooLargeError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — any framing error is a bad request
+            raise InvalidRequestError("The upload could not be read.") from exc
+
+    def finish(self) -> tuple[str | None, bytes]:
+        try:
+            self._parser.finalize()
+        except Exception as exc:  # noqa: BLE001
+            raise InvalidRequestError("The upload could not be read.") from exc
+        if not self._found:
+            raise InvalidRequestError("Send the document in a 'file' field.")
+        return self._filename, bytes(self._file)
+
+
+async def _read_file_part(request: Request) -> tuple[str | None, bytes]:
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
         raise FileTooLargeError()
-    body = bytearray()
+    reader = FileUploadReader(request.headers.get("content-type", ""))
     async for chunk in request.stream():
-        body += chunk
-        if len(body) > MAX_BODY_BYTES:
-            raise FileTooLargeError()
-    return bytes(body)
-
-
-def _parse_file_part(content_type: str, body: bytes) -> tuple[str | None, bytes]:
-    """The ``file`` part of a multipart body: (filename, bytes). In memory only."""
-    mime, params = parse_options_header(content_type)
-    boundary = params.get(b"boundary")
-    if mime != b"multipart/form-data" or not boundary:
-        raise InvalidRequestError("Send the document as multipart/form-data in a 'file' field.")
-
-    parts: list[dict[str, object]] = []
-    header_field = bytearray()
-    header_value = bytearray()
-
-    def on_part_begin() -> None:
-        parts.append({"headers": {}, "data": bytearray()})
-
-    def on_header_field(data: bytes, start: int, end: int) -> None:
-        header_field.extend(data[start:end])
-
-    def on_header_value(data: bytes, start: int, end: int) -> None:
-        header_value.extend(data[start:end])
-
-    def on_header_end() -> None:
-        headers = parts[-1]["headers"]
-        assert isinstance(headers, dict)  # noqa: S101 — narrowing for mypy
-        headers[bytes(header_field).lower()] = bytes(header_value)
-        header_field.clear()
-        header_value.clear()
-
-    def on_part_data(data: bytes, start: int, end: int) -> None:
-        buffer = parts[-1]["data"]
-        assert isinstance(buffer, bytearray)  # noqa: S101 — narrowing for mypy
-        buffer.extend(data[start:end])
-
-    parser = MultipartParser(
-        boundary,
-        {
-            "on_part_begin": on_part_begin,
-            "on_header_field": on_header_field,
-            "on_header_value": on_header_value,
-            "on_header_end": on_header_end,
-            "on_part_data": on_part_data,
-        },
-        max_size=MAX_BODY_BYTES,
-    )
-    try:
-        parser.write(body)
-        parser.finalize()
-    except Exception as exc:  # noqa: BLE001 — any framing error is a bad request
-        raise InvalidRequestError("The upload could not be read.") from exc
-
-    for part in parts:
-        headers = part["headers"]
-        data = part["data"]
-        assert isinstance(headers, dict) and isinstance(data, bytearray)  # noqa: S101
-        _, disposition = parse_options_header(headers.get(b"content-disposition", b""))
-        if disposition.get(b"name") == b"file":
-            raw_name = disposition.get(b"filename")
-            name = raw_name.decode("utf-8", "replace") if raw_name else None
-            return name, bytes(data)
-    raise InvalidRequestError("Send the document in a 'file' field.")
+        reader.feed(chunk)
+    return reader.finish()
 
 
 @router.post(
@@ -151,9 +187,7 @@ async def upload_document(
             limit=UPLOADS_PER_HOUR,
             window_seconds=3600,
         )
-    body = await _read_capped(request)
-    raw_name, data = _parse_file_part(request.headers.get("content-type", ""), body)
-    del body
+    raw_name, data = await _read_file_part(request)
     filename = display_filename(raw_name)
 
     extracted = await asyncio.to_thread(extract, data)

@@ -559,3 +559,80 @@ def test_paragraph_passages_cite_the_paragraph_they_come_from(monkeypatch, setti
         (3, "2"),
     ]
     assert all(embed_input.startswith("passage: lease.txt") for _, _, embed_input in chunks)
+
+
+# --- the size limit is enforced while reading (fix F2) ----------------------
+
+CHUNK = 64 * 1024
+ELEVEN_MB = 11 * 1024 * 1024
+
+
+def _streamed_upload(size: int, consumed: list[int]):
+    """An ~``size``-byte multipart upload, yielded in 64 KB chunks, counting what was pulled."""
+    boundary = "----capTestBoundary"
+    head = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="file"; filename="big.txt"\r\n'
+        "Content-Type: text/plain\r\n\r\n"
+    ).encode()
+    tail = f"\r\n--{boundary}--\r\n".encode()
+    content_type = f"multipart/form-data; boundary={boundary}"
+
+    def chunks():
+        yield head
+        consumed[0] += len(head)
+        sent = 0
+        block = b"a" * CHUNK
+        while sent < size:
+            piece = block[: min(CHUNK, size - sent)]
+            sent += len(piece)
+            consumed[0] += len(piece)
+            yield piece
+        yield tail
+
+    return content_type, chunks
+
+
+def test_the_reader_stops_at_the_limit_and_never_holds_more():
+    from app.api.v1.chat_documents import FileUploadReader
+
+    consumed = [0]
+    content_type, chunks = _streamed_upload(ELEVEN_MB, consumed)
+    reader = FileUploadReader(content_type)
+    with pytest.raises(FileTooLargeError):
+        for chunk in chunks():
+            reader.feed(chunk)
+    # It gave up within one chunk of the limit, not after reading 11 MB...
+    assert consumed[0] <= MAX_BYTES + CHUNK + 1024
+    assert consumed[0] < ELEVEN_MB
+    # ...and the file buffer never exceeded the limit itself.
+    assert reader.peak_file_bytes <= MAX_BYTES
+
+
+def test_a_file_exactly_at_the_limit_is_accepted_by_the_reader():
+    from app.api.v1.chat_documents import FileUploadReader
+
+    consumed = [0]
+    content_type, chunks = _streamed_upload(MAX_BYTES, consumed)
+    reader = FileUploadReader(content_type)
+    for chunk in chunks():
+        reader.feed(chunk)
+    name, data = reader.finish()
+    assert name == "big.txt" and len(data) == MAX_BYTES
+
+
+async def test_an_11_mb_streamed_upload_without_a_length_is_refused_mid_stream(
+    client, documents_app
+):
+    consumed = [0]
+    content_type, chunks = _streamed_upload(ELEVEN_MB, consumed)
+
+    async def body():
+        for chunk in chunks():
+            yield chunk
+
+    response = await client.post(
+        "/v1/chat/documents", content=body(), headers={"Content-Type": content_type}
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "file_too_large"
